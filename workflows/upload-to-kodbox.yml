@@ -1,0 +1,60 @@
+name: Upload backup to Kodbox
+
+on:
+  push:
+    paths:
+      - backups/ephone.json     # 你在仓库里的备份文件路径（按你的实际改）
+  workflow_dispatch:           # 也允许手动触发
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show file size
+        run: |
+          ls -lh backups || true
+          [ -f backups/ephone.json ] && du -h backups/ephone.json || (echo "no file"; exit 1)
+
+      - name: Ensure directories on WebDAV (MKCOL)
+        env:
+          KODBOX_BASE: ${{ secrets.KODBOX_BASE }}
+          KODBOX_USER: ${{ secrets.KODBOX_USER }}
+          KODBOX_PASS: ${{ secrets.KODBOX_PASS }}
+        run: |
+          set -e
+          TARGET_PATH="backups/ephone.json"        # 目标在 WebDAV 的相对路径（不要以/开头）
+          DIRS=$(dirname "$TARGET_PATH")
+          IFS='/' read -ra SEG <<< "$DIRS"
+          CURRENT=""
+          for s in "${SEG[@]}"; do
+            [ -z "$s" ] && continue
+            CURRENT="$CURRENT/$s"
+            # MKCOL（目录存在会返回405/409，忽略即可）
+            curl -sS -u "$KODBOX_USER:$KODBOX_PASS" -X MKCOL \
+              "$KODBOX_BASE${CURRENT#/}/" -o /dev/null -w "%{http_code}\n" | \
+              grep -E "^(201|405|409)$" >/dev/null || {
+                echo "MKCOL failed for $CURRENT"; exit 1;
+              }
+          done
+
+      - name: PUT file to WebDAV
+        env:
+          KODBOX_BASE: ${{ secrets.KODBOX_BASE }}
+          KODBOX_USER: ${{ secrets.KODBOX_USER }}
+          KODBOX_PASS: ${{ secrets.KODBOX_PASS }}
+        run: |
+          set -e
+          SRC="backups/ephone.json"                # 仓库里的文件
+          DST="backups/ephone.json"                # WebDAV 目标（与上一步一致）
+          curl -sS -u "$KODBOX_USER:$KODBOX_PASS" -T "$SRC" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            "$KODBOX_BASE${DST}" -o /dev/null -w "%{http_code}\n" | \
+            grep -E "^(200|201|204)$" >/dev/null || {
+              echo "PUT failed"; exit 1;
+            }
+
+      - name: Done
+        run: echo "Uploaded to Kodbox successfully."
