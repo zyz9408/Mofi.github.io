@@ -6363,6 +6363,88 @@ async function exportBackup() {
         await showCustomAlert('导出失败', `发生了一个错误: ${error.message}`);
     }
 }
+/**
+         * 【全新】静默备份函数，模拟上传到GitHub
+         */
+        async function uploadBackupToGithub() {
+            // ▼▼▼ 在这里直接填写您的配置信息 ▼▼▼
+            const GITHUB_CONFIG = {
+                owner: 'zyz9408',      // 替换为您的GitHub用户名
+                repo: 'Mofi.github.io',       // 替换为您的仓库名
+                path: 'backup.json', // 替换为文件路径，例如 'backups/data.json'
+                pat: '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'   // 替换为您生成的PAT
+            };
+            // ▲▲▲ 配置结束 ▲▲▲
+
+            if (!GITHUB_CONFIG.owner || !GITHUB_CONFIG.repo || !GITHUB_CONFIG.path || !GITHUB_CONFIG.pat || GITHUB_CONFIG.pat === 'YOUR_PERSONAL_ACCESS_TOKEN') {
+                console.log("[GitHub Backup] 未在代码中配置GitHub参数，跳过自动备份。");
+                return;
+            }
+
+            try {
+                // 1. 收集所有数据 (与导出功能相同)
+                const backupData = { version: 1, timestamp: Date.now() };
+                const [
+                    chats, worldBooks, userStickers, apiConfig, globalSettings, personaPresets, musicLibrary,
+                    qzoneSettings, qzonePosts, qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories, worldBookCategories
+                ] = await Promise.all([
+                    db.chats.toArray(), db.worldBooks.toArray(), db.userStickers.toArray(), db.apiConfig.get('main'),
+                    db.globalSettings.get('main'), db.personaPresets.toArray(), db.musicLibrary.get('main'),
+                    db.qzoneSettings.get('main'), db.qzonePosts.toArray(), db.qzoneAlbums.toArray(),
+                    db.qzonePhotos.toArray(), db.favorites.toArray(), db.qzoneGroups.toArray(),
+                    db.memories.toArray(), db.worldBookCategories.toArray()
+                ]);
+                Object.assign(backupData, { chats, worldBooks, userStickers, apiConfig, globalSettings, personaPresets, musicLibrary, qzoneSettings, qzonePosts, qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories, worldBookCategories });
+
+                const contentString = JSON.stringify(backupData, null, 2);
+                const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
+
+                const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.path}`;
+                const headers = {
+                    'Authorization': `token ${GITHUB_CONFIG.pat}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                };
+
+                // 2. 尝试获取现有文件的SHA，以便进行更新
+                let existingFileSha = null;
+                try {
+                    const response = await fetch(apiUrl, { method: 'GET', headers: headers });
+                    if (response.ok) {
+                        const data = await response.json();
+                        existingFileSha = data.sha;
+                    } else if (response.status !== 404) {
+                        // 如果不是文件不存在(404)，则可能是一个真正的错误
+                        const errorText = await response.text();
+                        throw new Error(`获取文件SHA失败: ${response.status} - ${errorText}`);
+                    }
+                } catch (e) {
+                    console.warn("获取文件SHA时发生错误（或文件不存在），将尝试创建新文件:", e.message);
+                }
+
+                // 3. 创建或更新文件
+                const body = {
+                    message: `EPhone Auto-Backup: ${new Date().toISOString()}`,
+                    content: contentBase64,
+                    sha: existingFileSha // 如果为null，API会创建新文件；否则会更新
+                };
+
+                const putResponse = await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: JSON.stringify(body)
+                });
+
+                if (!putResponse.ok) {
+                    const errorData = await putResponse.json();
+                    throw new Error(`上传失败: ${errorData.message}`);
+                }
+
+                console.log(`[GitHub Backup] ${new Date().toLocaleString()} - 数据已成功上传到 ${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.path}`);
+
+            } catch (error) {
+                console.error("[GitHub Backup] 自动上传失败:", error);
+            }
+        }
 
         // ▼▼▼ 用这个新函数，替换旧的 importBackup 函数 ▼▼▼
         async function importBackup(jsonText) { // 1. 参数从 file 变为了 jsonText
@@ -12819,8 +12901,10 @@ async function deleteCategory(categoryId) {
     // ▼▼▼ 在 init() 函数的【最开头】，粘贴下面这两行代码 ▼▼▼
     const savedTheme = localStorage.getItem('ephone-theme') || 'light'; // 默认为日间模式
     applyTheme(savedTheme);
-    // ▲▲▲ 粘贴结束 ▲▲▲
-
+            // ▲▲▲ 粘贴结束 ▲▲▲
+            // ▼▼▼ 在这里添加下面这行新代码 ▼▼▼
+            uploadBackupToGithub(); 
+            // ▲▲▲ 添加结束 ▲▲
     // ▼▼▼ 新增代码 ▼▼▼
     const customBubbleStyleTag = document.createElement('style');
     customBubbleStyleTag.id = 'custom-bubble-style';
@@ -12838,6 +12922,7 @@ async function deleteCategory(categoryId) {
     applyScopedCss('', '#chat-messages', 'custom-bubble-style'); // 清除真实聊天界面的自定义样式
     applyScopedCss('', '#settings-preview-area', 'preview-bubble-style'); // 清除预览区的自定义样式
     // ▲▲▲ 修改结束 ▲▲▲
+	
 
             window.showScreen = showScreen;
             window.renderChatListProxy = renderChatList;
