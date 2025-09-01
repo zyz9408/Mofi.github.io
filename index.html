@@ -6464,7 +6464,7 @@ async function exportBackup() {
                     throw new Error(`上传失败：${putResp.status} - ${text}`);
                 }
 
-                console.log(`[Kodbox Backup] ${new Date().toLocaleString()} - 已恢复数据 ${targetUrl}`);
+                console.log(`[Kodbox Backup] ${new Date().toLocaleString()} - 已上传到 ${targetUrl}`);
             } catch (err) {
                 console.error('[Kodbox Backup] 失败：', err);
             }
