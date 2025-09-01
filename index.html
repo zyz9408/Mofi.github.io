@@ -4367,6 +4367,9 @@ input:checked + .slider:before {
 
 <!-- ① 普通按钮，和“导出”一个 class -->
 <button class="form-button" id="import-btn">导入备份文件</button>
+<!-- ▼▼▼ 在“导入备份文件”按钮的下一行，添加这个新按钮 ▼▼▼ -->
+<button class="form-button form-button-secondary" id="test-webdav-btn">测试网络服务</button>
+<!-- ▲▲▲ 添加结束 ▲▲▲ -->
 
 </div></div>
 <!-- ▼▼▼ 用下面这段代码，完整替换掉你原来的 chat-list-screen ▼▼▼ -->
@@ -6368,107 +6371,119 @@ async function exportBackup() {
  * 【WebDAV 版】将数据备份上传到 Kodbox（可道云）
  * 依赖：Kodbox 已启用 WebDAV 插件，并确认账号对目标目录有写权限
  */
-        async function uploadBackupToKodboxViaWebDAV() {
-            // ▼▼▼ 在这里直接填写您的 WebDAV 配置 ▼▼▼
-            const DAV_CONFIG = {
-                // WebDAV 根地址，通常形如：
-                //  - https://your-kodbox-host/webdav/xxx/  （从 Kodbox“个人中心”复制）
-                //  - 或管理员配置给你的专属路径
-                baseUrl: 'https://mofi1994.xyz/index.php/dav/my/',
+async function uploadBackupToKodboxViaWebDAV(showAlerts = false) {
+    // ▼▼▼ 在这里直接填写您的 WebDAV 配置 ▼▼▼
+    const DAV_CONFIG = {
+        // WebDAV 根地址，通常形如：
+        //  - https://your-kodbox-host/webdav/xxx/  （从 Kodbox“个人中心”复制）
+        //  - 或管理员配置给你的专属路径
+        baseUrl: 'https://mofi1994.xyz/index.php/dav/my/',
 
-                // 目标相对路径与文件名（不能以 / 开头）
-                // 例如：'backups/ephone.json'
-                path: 'backups/ephone.json',
+        // 目标相对路径与文件名（不能以 / 开头）
+        // 例如：'backups/ephone.json'
+        path: 'backups/ephoneNew.json',
 
-                // WebDAV 基本认证
-                username: 'zyz9408',
-                password: 'a600422mm',
-            };
-            // ▲▲▲ 配置结束 ▲▲▲
+        // WebDAV 基本认证
+        username: 'zyz9408',
+        password: 'a600422mm',
+    };
+    // ▲▲▲ 配置结束 ▲▲▲
 
-            if (
-                !DAV_CONFIG.baseUrl ||
-                !DAV_CONFIG.path ||
-                !DAV_CONFIG.username ||
-                !DAV_CONFIG.password
-            ) {
-                console.log('[Kodbox Backup] 未配置 WebDAV 参数，跳过备份。');
-                return;
-            }
+    if (
+        !DAV_CONFIG.baseUrl ||
+        !DAV_CONFIG.path ||
+        !DAV_CONFIG.username ||
+        !DAV_CONFIG.password
+    ) {
+        if (showAlerts) {
+            await showCustomAlert('测试失败', 'WebDAV 参数未在代码中配置，无法进行测试。');
+        }
+        console.log('[Kodbox Backup] 未配置 WebDAV 参数，跳过备份。');
+        return;
+    }
 
-            try {
-                // 1) 收集数据 —— 与原导出一致
-                const backupData = { version: 1, timestamp: Date.now() };
-                const [
-                    chats, worldBooks, userStickers, apiConfig, globalSettings, personaPresets, musicLibrary,
-                    qzoneSettings, qzonePosts, qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories, worldBookCategories
-                ] = await Promise.all([
-                    db.chats.toArray(), db.worldBooks.toArray(), db.userStickers.toArray(), db.apiConfig.get('main'),
-                    db.globalSettings.get('main'), db.personaPresets.toArray(), db.musicLibrary.get('main'),
-                    db.qzoneSettings.get('main'), db.qzonePosts.toArray(), db.qzoneAlbums.toArray(),
-                    db.qzonePhotos.toArray(), db.favorites.toArray(), db.qzoneGroups.toArray(),
-                    db.memories.toArray(), db.worldBookCategories.toArray()
-                ]);
-                Object.assign(backupData, {
-                    chats, worldBooks, userStickers, apiConfig, globalSettings, personaPresets, musicLibrary,
-                    qzoneSettings, qzonePosts, qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories, worldBookCategories
-                });
+    try {
+        // 1) 收集数据 —— 与原导出一致
+        const backupData = { version: 1, timestamp: Date.now() };
+        const [
+            chats, worldBooks, userStickers, apiConfig, globalSettings, personaPresets, musicLibrary,
+            qzoneSettings, qzonePosts, qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories, worldBookCategories
+        ] = await Promise.all([
+            db.chats.toArray(), db.worldBooks.toArray(), db.userStickers.toArray(), db.apiConfig.get('main'),
+            db.globalSettings.get('main'), db.personaPresets.toArray(), db.musicLibrary.get('main'),
+            db.qzoneSettings.get('main'), db.qzonePosts.toArray(), db.qzoneAlbums.toArray(),
+            db.qzonePhotos.toArray(), db.favorites.toArray(), db.qzoneGroups.toArray(),
+            db.memories.toArray(), db.worldBookCategories.toArray()
+        ]);
+        Object.assign(backupData, {
+            chats, worldBooks, userStickers, apiConfig, globalSettings, personaPresets, musicLibrary,
+            qzoneSettings, qzonePosts, qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories, worldBookCategories
+        });
 
-                const contentString = JSON.stringify(backupData, null, 2);
-                const fileBlob = new Blob([contentString], { type: 'application/json;charset=utf-8' });
+        const contentString = JSON.stringify(backupData, null, 2);
+        const fileBlob = new Blob([contentString], { type: 'application/json;charset=utf-8' });
 
-                // 2) 确保目录存在（逐级 MKCOL）
-                const urlJoin = (...parts) => parts.map(p => String(p).replace(/(^\/+|\/+$)/g, '')).filter(Boolean).join('/');
-                const ensureDirs = async () => {
-                    const base = new URL(DAV_CONFIG.baseUrl);
-                    const segs = DAV_CONFIG.path.split('/').slice(0, -1).filter(Boolean);
+        // 2) 确保目录存在（逐级 MKCOL）
+        const urlJoin = (...parts) => parts.map(p => String(p).replace(/(^\/+|\/+$)/g, '')).filter(Boolean).join('/');
+        const ensureDirs = async () => {
+            const base = new URL(DAV_CONFIG.baseUrl);
+            const segs = DAV_CONFIG.path.split('/').slice(0, -1).filter(Boolean);
 
-                    let current = base.pathname.replace(/\/+$/, '');
-                    for (const seg of segs) {
-                        current += '/' + encodeURIComponent(seg);
-                        const dirUrl = new URL(current + '/', base.origin);
+            let current = base.pathname.replace(/\/+$/, '');
+            for (const seg of segs) {
+                current += '/' + encodeURIComponent(seg);
+                const dirUrl = new URL(current + '/', base.origin);
 
-                        // 直接 MKCOL，存在则一般返回 405 或 409，忽略即可
-                        const mk = await fetch(dirUrl.toString(), {
-                            method: 'MKCOL',
-                            headers: {
-                                Authorization: 'Basic ' + btoa(DAV_CONFIG.username + ':' + DAV_CONFIG.password),
-                            },
-                            // 让浏览器明确走 CORS 流程（有些环境下可省略）
-                            mode: 'cors',
-                        });
-
-                        if (!(mk.status === 201 || mk.status === 405 || mk.status === 409)) {
-                            // 其他错误才认为失败
-                            const t = await mk.text().catch(() => '');
-                            throw new Error(`创建目录失败: ${decodeURIComponent(seg)} (${mk.status}) ${t}`);
-                        }
-                    }
-                };
-
-                await ensureDirs();
-
-                // 3) 直接 PUT 写入（存在则覆盖）
-                const targetUrl = new URL(urlJoin(DAV_CONFIG.baseUrl, DAV_CONFIG.path));
-                const putResp = await fetch(targetUrl.toString(), {
-                    method: 'PUT',
+                // 直接 MKCOL，存在则一般返回 405 或 409，忽略即可
+                const mk = await fetch(dirUrl.toString(), {
+                    method: 'MKCOL',
                     headers: {
                         Authorization: 'Basic ' + btoa(DAV_CONFIG.username + ':' + DAV_CONFIG.password),
-                        'Content-Type': 'application/json;charset=utf-8',
                     },
-                    body: fileBlob,
+                    // 让浏览器明确走 CORS 流程（有些环境下可省略）
+                    mode: 'cors',
                 });
 
-                if (!putResp.ok) {
-                    const text = await putResp.text();
-                    throw new Error(`上传失败：${putResp.status} - ${text}`);
+                if (!(mk.status === 201 || mk.status === 405 || mk.status === 409)) {
+                    // 其他错误才认为失败
+                    const t = await mk.text().catch(() => '');
+                    throw new Error(`创建目录失败: ${decodeURIComponent(seg)} (${mk.status}) ${t}`);
                 }
-
-                console.log(`[Kodbox Backup] ${new Date().toLocaleString()} - 已上传到 ${targetUrl}`);
-            } catch (err) {
-                console.error('[Kodbox Backup] 失败：', err);
             }
+        };
+
+        await ensureDirs();
+
+        // 3) 直接 PUT 写入（存在则覆盖）
+        const targetUrl = new URL(urlJoin(DAV_CONFIG.baseUrl, DAV_CONFIG.path));
+        const putResp = await fetch(targetUrl.toString(), {
+            method: 'PUT',
+            headers: {
+                Authorization: 'Basic ' + btoa(DAV_CONFIG.username + ':' + DAV_CONFIG.password),
+                'Content-Type': 'application/json;charset=utf-8',
+            },
+            body: fileBlob,
+        });
+
+        if (!putResp.ok) {
+            const text = await putResp.text();
+            throw new Error(`上传失败：${putResp.status} - ${text}`);
         }
+        
+        // 【核心修改】根据参数决定是否弹窗
+        if (showAlerts) {
+            await showCustomAlert('测试成功', '网络测试成功');
+        }
+        
+        console.log(`[Kodbox Backup] ${new Date().toLocaleString()} - 已上传到 ${targetUrl}`);
+    } catch (err) {
+        // 【核心修改】根据参数决定是否弹窗
+        if (showAlerts) {
+            await showCustomAlert('测试失败', `网络测试失败，请检查配置或网络。\n\n错误原因: ${err.message}`);
+        }
+        console.error('[Kodbox Backup] 失败：', err);
+    }
+}
 
 
         // ▼▼▼ 用这个新函数，替换旧的 importBackup 函数 ▼▼▼
@@ -12930,6 +12945,12 @@ async function deleteCategory(categoryId) {
             // ▼▼▼ 在这里添加下面这行新代码 ▼▼▼
             uploadBackupToKodboxViaWebDAV(); 
             // ▲▲▲ 添加结束 ▲▲
+			// ▼▼▼ 在 init() 函数的事件监听器区域末尾，添加这段新代码 ▼▼▼
+document.getElementById('test-webdav-btn').addEventListener('click', async () => {
+    // 调用备份函数，并传入 true 来激活弹窗提示
+    await uploadBackupToKodboxViaWebDAV(true);
+});
+// ▲▲▲ 添加结束 ▲▲▲
     // ▼▼▼ 新增代码 ▼▼▼
     const customBubbleStyleTag = document.createElement('style');
     customBubbleStyleTag.id = 'custom-bubble-style';
