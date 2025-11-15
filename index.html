@@ -48,6 +48,11 @@
 
 
     <style>
+        /* AI图片生成加载动画 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <!-- ▼▼▼ 在这里添加下面这行 ▼▼▼ -->
     <style id="custom-theme-style"></style>
@@ -2604,6 +2609,196 @@
 
 <!-- ▲▲▲ 新代码粘贴结束 ▲▲▲ -->
 
+<!-- ▼▼▼ 图片生成API配置 ▼▼▼ -->
+<hr style="opacity: 0.2; margin: 20px 0;">
+<div class="form-group">
+    <label for="image-generation-toggle" class="toggle-switch-label">
+        <span class="toggle-switch-text">
+            启用AI图片生成
+            <p style="font-size: 12px; font-weight: normal; color: #999; margin-top: 5px;">
+                开启后，聊天和朋友圈中的图片将由AI生成
+            </p>
+        </span>
+        <input type="checkbox" id="image-generation-toggle">
+        <span class="toggle-switch-slider"></span>
+    </label>
+</div>
+
+<div id="image-generation-details" style="display: none; padding-left: 10px; border-left: 3px solid var(--accent-color); margin-top: 15px;">
+    <!-- ▼▼▼ 模板选择和管理 ▼▼▼ -->
+    <div class="form-group">
+        <label>配置模板</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="image-gen-template-select" style="flex: 1;">
+                <option value="">-- 不使用模板 --</option>
+            </select>
+            <button id="load-image-gen-template-btn" class="form-button-secondary" style="margin: 0; padding: 10px;">加载</button>
+            <button id="manage-image-gen-templates-btn" class="form-button-secondary" style="margin: 0; padding: 10px;">管理</button>
+        </div>
+        <button id="save-as-image-gen-template-btn" class="form-button-secondary" style="margin-top: 10px; width: 100%;">💾 保存当前配置为模板</button>
+    </div>
+    <hr style="opacity: 0.2; margin: 15px 0;">
+    <!-- ▲▲▲ 模板管理结束 ▲▲▲ -->
+
+    <!-- API提供商选择 -->
+    <div class="form-group">
+        <label for="image-api-provider">API提供商</label>
+        <select id="image-api-provider">
+            <option value="chat_api">Chat API (通用)</option>
+            <option value="runninghub">RunningHub API</option>
+        </select>
+    </div>
+
+    <!-- 角色图片URL -->
+    <div class="form-group">
+        <label for="character-image-url">角色图片URL</label>
+        <input type="text" id="character-image-url" placeholder="https://example.com/character.jpg">
+        <small style="color: #666; display: block; margin-top: 5px;">用于作为图片生成的参考图</small>
+    </div>
+
+    <!-- Chat API 配置 -->
+    <div id="chat-api-config" class="api-config-section">
+        <div class="form-group">
+            <label for="chat-image-api-url">Chat API 地址</label>
+            <input type="text" id="chat-image-api-url" placeholder="https://tokencount.aigemini.org">
+        </div>
+        <div class="form-group">
+            <label for="chat-image-api-key">Chat API Key</label>
+            <input type="password" id="chat-image-api-key" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+            <label for="chat-image-model">图片生成模型</label>
+            <input type="text" id="chat-image-model" placeholder="gpt-4o">
+        </div>
+        <div class="form-group">
+            <label for="chat-image-size">图片尺寸</label>
+            <select id="chat-image-size">
+                <option value="1024x1024">方形 (1024x1024)</option>
+                <option value="1024x1792">竖屏 (1024x1792)</option>
+                <option value="1792x1024">横屏 (1792x1024)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="force-base64" style="width: auto; margin-right: 8px;">
+                强制Base64发送图片
+            </label>
+            <small style="color: #666; display: block; margin-top: 5px;">解决 "Invalid image input" 错误</small>
+        </div>
+    </div>
+
+    <!-- RunningHub API 配置 -->
+    <div id="runninghub-api-config" class="api-config-section" style="display: none;">
+        <div class="form-group">
+            <label for="runninghub-webapp-id">WebApp ID</label>
+            <input type="text" id="runninghub-webapp-id" placeholder="1976724532084068354">
+        </div>
+        <div class="form-group">
+            <label for="runninghub-api-key">API Key</label>
+            <input type="password" id="runninghub-api-key" placeholder="3dbcc0be67b649e1b4380bfbcafc789e">
+        </div>
+        <div class="form-group">
+            <label for="runninghub-size">出图尺寸</label>
+            <input type="text" id="runninghub-size" value="2K" placeholder="2K">
+        </div>
+        <div class="form-group">
+            <label for="runninghub-aspect-ratio">宽高比</label>
+            <input type="text" id="runninghub-aspect-ratio" value="分辨率9:16" placeholder="分辨率9:16">
+        </div>
+    </div>
+
+    <!-- AI提示词优化配置 -->
+    <hr style="opacity: 0.2; margin: 15px 0;">
+    <div class="form-group">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" id="enable-prompt-optimization" style="width: auto; margin-right: 8px;">
+            启用AI提示词优化
+        </label>
+    </div>
+
+    <div id="prompt-optimization-config" style="display: none; margin-top: 10px;">
+        <div class="form-group">
+            <label for="optimization-level">优化级别</label>
+            <select id="optimization-level">
+                <option value="light">轻度 - 仅翻译，保留原意</option>
+                <option value="medium" selected>中度 - 平衡翻译与安全</option>
+                <option value="heavy">重度 - 强调安全与艺术</option>
+            </select>
+            <small style="color: #666; display: block; margin-top: 5px;">
+                轻度：保留细节，适合精确控制<br>
+                中度：平衡效果，推荐使用<br>
+                重度：最安全，但可能改变较多
+            </small>
+        </div>
+        <div class="form-group">
+            <label for="optimization-api-url">优化API地址</label>
+            <input type="text" id="optimization-api-url" placeholder="https://api.openai.com">
+        </div>
+        <div class="form-group">
+            <label for="optimization-api-key">优化API Key</label>
+            <input type="password" id="optimization-api-key" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+            <label for="optimization-model">优化用模型</label>
+            <input type="text" id="optimization-model" value="gpt-3.5-turbo" placeholder="gpt-3.5-turbo">
+        </div>
+    </div>
+</div>
+<!-- ▲▲▲ 图片生成API配置结束 ▲▲▲ -->
+
+<!-- ▼▼▼ Fish Audio语音生成配置 ▼▼▼ -->
+<hr style="opacity: 0.2; margin: 20px 0;">
+<div class="form-group" id="fish-audio-config-group">
+    <label for="fish-audio-toggle" class="toggle-switch-label">
+        <span class="toggle-switch-text">
+            启用Fish Audio语音生成
+            <p style="font-size: 12px; font-weight: normal; color: #999; margin-top: 5px;">
+                开启后，可为文本消息生成AI语音
+            </p>
+        </span>
+        <input type="checkbox" id="fish-audio-toggle">
+        <span class="toggle-switch-slider"></span>
+    </label>
+</div>
+
+<div id="fish-audio-details" style="display: none; padding-left: 10px; border-left: 3px solid var(--accent-color); margin-top: 15px;">
+    <div class="form-group">
+        <label for="fish-audio-api-key">Fish Audio API Key</label>
+        <input type="password" id="fish-audio-api-key" placeholder="输入你的Fish Audio API Key">
+        <small style="color: #666; display: block; margin-top: 5px;">
+            从 <a href="https://fish.audio/app/api-keys" target="_blank" style="color: var(--accent-color);">fish.audio/app/api-keys</a> 获取
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="fish-audio-reference-id">语音模型ID (Reference ID)</label>
+        <input type="text" id="fish-audio-reference-id" placeholder="例如: 8ef4a238714b45718ce04243307c57a7">
+        <small style="color: #666; display: block; margin-top: 5px;">
+            从 <a href="https://fish.audio" target="_blank" style="color: var(--accent-color);">fish.audio</a> 选择语音模型，复制模型ID
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="fish-audio-format">音频格式</label>
+        <select id="fish-audio-format">
+            <option value="mp3" selected>MP3</option>
+            <option value="wav">WAV</option>
+            <option value="pcm">PCM</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" id="fish-audio-auto-generate" style="width: auto; margin-right: 8px;">
+            自动为AI回复生成语音
+        </label>
+        <small style="color: #666; display: block; margin-top: 5px;">
+            开启后，AI每次回复时都会自动生成语音
+        </small>
+    </div>
+</div>
+<!-- ▲▲▲ Fish Audio语音生成配置结束 ▲▲▲ -->
+
 </div><div class="modal-footer"><button class="cancel" id="cancel-chat-settings-btn">取消</button><button class="save" id="save-chat-settings-btn">保存</button></div></div></div>
     
     <div id="persona-library-modal" class="modal"><div class="modal-content"><div class="modal-header"><span>我的人设库</span><button id="add-persona-preset-btn" class="action-button">添加</button></div><div class="modal-body"><div id="persona-library-grid"></div></div><div class="modal-footer"><button class="cancel" id="close-persona-library-btn">关闭</button></div></div></div>
@@ -2642,6 +2837,24 @@
     </div>
 </div>
 <!-- ▲▲▲ 替换到这里结束 ▲▲▲ -->
+
+<!-- ▼▼▼ 图片生成模板管理弹窗 ▼▼▼ -->
+<div id="image-gen-template-manager-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>图片生成模板管理</span>
+        </div>
+        <div class="modal-body">
+            <div id="image-gen-templates-list" style="max-height: 400px; overflow-y: auto;">
+                <!-- 模板列表将动态生成 -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="cancel" id="close-image-gen-template-manager-btn">关闭</button>
+        </div>
+    </div>
+</div>
+<!-- ▲▲▲ 图片生成模板管理弹窗结束 ▲▲▲ -->
 
 
 
@@ -8518,6 +8731,7 @@ db.version(52).stores({ // 版本号从 51 升级到 52
     datingSprites: '++id, groupId, description, url',
     datingHistory: '++id, characterId, timestamp',
     offlinePresets: '++id, name',
+    imageGenTemplates: '++id, name',
     // ▼▼▼ 在这里添加下面这两行新代码 ▼▼▼
     elemeFoods: '++id, name, category',
     elemeOrders: '++id, recipientId, timestamp'
@@ -9947,7 +10161,7 @@ async function exportBackup() {
             timestamp: Date.now()
         };
 
-        // --- 核心修改1：在这里加入了 charStickers ---
+        // --- 核心修改1：在这里加入了 charStickers 和 imageGenTemplates ---
         const [
             chats, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
             personaPresets, musicLibrary, qzoneSettings, qzonePosts,
@@ -9956,7 +10170,7 @@ async function exportBackup() {
             apiPresets, bubbleStylePresets, fontPresets, homeScreenPresets, datingScenes,
             datingPresets, datingSpriteGroups, datingSprites, datingHistory, pomodoroSessions,
             ludoQuestionBanks, ludoQuestions, scriptKillScripts, taobaoProducts,
-            taobaoOrders, taobaoCart, userWalletTransactions, userStickerCategories
+            taobaoOrders, taobaoCart, userWalletTransactions, userStickerCategories, imageGenTemplates
         ] = await Promise.all([
             db.chats.toArray(),
             db.worldBooks.toArray(),
@@ -9994,10 +10208,11 @@ async function exportBackup() {
             db.taobaoOrders.toArray(),
             db.taobaoCart.toArray(),
             db.userWalletTransactions.toArray(),
-            db.userStickerCategories.toArray()
+            db.userStickerCategories.toArray(),
+            db.imageGenTemplates.toArray()
         ]);
-        
-        // --- 核心修改2：在这里也加入了 charStickers ---
+
+        // --- 核心修改2：在这里也加入了 charStickers 和 imageGenTemplates ---
         Object.assign(backupData, {
             chats, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
             personaPresets, musicLibrary, qzoneSettings, qzonePosts,
@@ -10006,8 +10221,31 @@ async function exportBackup() {
             apiPresets, bubbleStylePresets, fontPresets, homeScreenPresets, datingScenes,
             datingPresets, datingSpriteGroups, datingSprites, datingHistory, pomodoroSessions,
             ludoQuestionBanks, ludoQuestions, scriptKillScripts, taobaoProducts,
-            taobaoOrders, taobaoCart, userWalletTransactions, userStickerCategories
+            taobaoOrders, taobaoCart, userWalletTransactions, userStickerCategories, imageGenTemplates
         });
+
+        // ▼▼▼ 验证并记录图片生成配置的导出 ▼▼▼
+        const chatsWithImageGen = chats.filter(chat => chat.settings?.imageGeneration?.enabled);
+        if (chatsWithImageGen.length > 0) {
+            console.log(`[导出备份] 已包含 ${chatsWithImageGen.length} 个角色的AI图片生成配置:`,
+                chatsWithImageGen.map(c => ({
+                    name: c.name,
+                    provider: c.settings.imageGeneration.provider,
+                    hasCharacterImage: !!c.settings.imageGeneration.characterImageUrl
+                }))
+            );
+        }
+
+        // 验证并记录图片生成模板的导出
+        if (imageGenTemplates && imageGenTemplates.length > 0) {
+            console.log(`[导出备份] 已包含 ${imageGenTemplates.length} 个图片生成模板:`,
+                imageGenTemplates.map(t => ({
+                    name: t.name,
+                    provider: t.data?.provider
+                }))
+            );
+        }
+        // ▲▲▲ 图片生成配置验证结束 ▲▲▲
         
         // homeScreenState 和下载逻辑保持不变...
         backupData.homeScreenState = {
@@ -10143,6 +10381,19 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
             taobaoOrders, taobaoCart, userWalletTransactions, userStickerCategories
         });
 
+        // ▼▼▼ 验证并记录图片生成配置的上传 ▼▼▼
+        const chatsWithImageGen = chats.filter(chat => chat.settings?.imageGeneration?.enabled);
+        if (chatsWithImageGen.length > 0) {
+            console.log(`[KOD云备份] 已包含 ${chatsWithImageGen.length} 个角色的AI图片生成配置:`,
+                chatsWithImageGen.map(c => ({
+                    name: c.name,
+                    provider: c.settings.imageGeneration.provider,
+                    hasCharacterImage: !!c.settings.imageGeneration.characterImageUrl
+                }))
+            );
+        }
+        // ▲▲▲ 图片生成配置验证结束 ▲▲▲
+
         backupData.homeScreenState = {
             'profile-banner-img': document.getElementById('profile-banner-img')?.src || '',
             'profile-avatar-img': document.getElementById('profile-avatar-img')?.src || '',
@@ -10267,7 +10518,7 @@ async function importBackup(file) {
                 'chats', 'worldBooks', 'userStickers', 'charStickers', 'personaPresets', // <--- 在这里加入了 'charStickers'
                 'qzonePosts', 'qzoneAlbums', 'qzonePhotos', 'favorites', 'qzoneGroups', 'memories',
                 'worldBookCategories', 'callRecords', 'customAvatarFrames', 'themes',
-                'apiPresets', 'bubbleStylePresets', 'fontPresets', 'homeScreenPresets' 
+                'apiPresets', 'bubbleStylePresets', 'fontPresets', 'homeScreenPresets', 'imageGenTemplates'
                 // 注意：这里可能比你的代码多一些表，不用担心，直接完整替换即可，多的不会产生影响。
             ];
 
@@ -10309,6 +10560,32 @@ for (const tableName of arrayTables) {
         if (validItems.length > 0) {
             console.log(`正在导入 ${validItems.length} 条数据到表格: ${tableName}...`);
             await db[tableName].bulkPut(validItems);
+
+            // ▼▼▼ 验证图片生成配置的导入 ▼▼▼
+            if (tableName === 'chats') {
+                const chatsWithImageGen = validItems.filter(chat => chat.settings?.imageGeneration?.enabled);
+                if (chatsWithImageGen.length > 0) {
+                    console.log(`[导入备份] 已恢复 ${chatsWithImageGen.length} 个角色的AI图片生成配置:`,
+                        chatsWithImageGen.map(c => ({
+                            name: c.name,
+                            provider: c.settings.imageGeneration.provider,
+                            hasCharacterImage: !!c.settings.imageGeneration.characterImageUrl,
+                            optimizationEnabled: c.settings.imageGeneration.optimization?.enabled || false
+                        }))
+                    );
+                }
+            }
+
+            // 验证图片生成模板的导入
+            if (tableName === 'imageGenTemplates') {
+                console.log(`[导入备份] 已恢复 ${validItems.length} 个图片生成模板:`,
+                    validItems.map(t => ({
+                        name: t.name,
+                        provider: t.data?.provider
+                    }))
+                );
+            }
+            // ▲▲▲ 图片生成配置验证结束 ▲▲▲
         }
 
     } else {
@@ -13199,7 +13476,10 @@ if (hasTrajectory) {
     else if (msg.type === 'user_photo' || msg.type === 'ai_image') {
         bubble.classList.add('is-ai-image');
         const altText = msg.type === 'user_photo' ? "用户描述的照片" : "AI生成的图片";
-        contentHtml = `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="ai-generated-image" alt="${altText}" data-description="${msg.content}">`;
+        // 优先使用已生成的图片URL，否则使用占位图
+        const imageSrc = msg.generatedImageUrl || 'https://i.postimg.cc/KYr2qRCK/1.jpg';
+        const generatedAttr = msg.generatedImageUrl ? 'data-generated="true"' : '';
+        contentHtml = `<img src="${imageSrc}" class="ai-generated-image" alt="${altText}" data-description="${msg.content}" data-msg-timestamp="${msg.timestamp}" ${generatedAttr}>`;
     } else if (msg.type === 'voice_message') {
     bubble.classList.add('is-voice-message');
     
@@ -18147,7 +18427,7 @@ function toggleMessageSelection(timestamp) {
 }
 // ▲▲▲ 替换结束 ▲▲▲
 
-        function addLongPressListener(element, callback) { let pressTimer; const startPress = (e) => { if(isSelectionMode) return; e.preventDefault(); pressTimer = window.setTimeout(() => callback(e), 500); }; const cancelPress = () => clearTimeout(pressTimer); element.addEventListener('mousedown', startPress); element.addEventListener('mouseup', cancelPress); element.addEventListener('mouseleave', cancelPress); element.addEventListener('touchstart', startPress, { passive: true }); element.addEventListener('touchend', cancelPress); element.addEventListener('touchmove', cancelPress); }
+        function addLongPressListener(element, callback) { let pressTimer; const startPress = (e) => { if(isSelectionMode) return; if(e.type !== 'touchstart') { e.preventDefault(); } pressTimer = window.setTimeout(() => callback(e), 500); }; const cancelPress = () => clearTimeout(pressTimer); element.addEventListener('mousedown', startPress); element.addEventListener('mouseup', cancelPress); element.addEventListener('mouseleave', cancelPress); element.addEventListener('touchstart', startPress, { passive: true }); element.addEventListener('touchend', cancelPress); element.addEventListener('touchmove', cancelPress); }
 
         async function handleListenTogetherClick() { 
 
@@ -37994,6 +38274,863 @@ async function clearAllQzonePosts() {
     }
 }
 
+// ======================================================
+// AI图片生成核心功能
+// ======================================================
+
+/**
+ * 图片URL转Base64
+ */
+async function imageUrlToBase64(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => reject(new Error('无法加载图片'));
+        img.src = url;
+    });
+}
+
+/**
+ * 本地敏感词过滤
+ */
+function applySafetyFilter(prompt) {
+    const safetyMap = {
+        '性感': '优雅', '诱惑': '迷人', '暴露': '时尚', '裸': '艺术', '色情': '艺术',
+        '内衣': '休闲装', '比基尼': '泳装', '睡衣': '居家服', '透视': '薄纱',
+        '亲吻': '相拥', '拥抱': '靠近', '抚摸': '触碰',
+        '床上': '室内', '浴室': '房间', '卧室': '房间'
+    };
+    let filtered = prompt;
+    for (const [sensitive, safe] of Object.entries(safetyMap)) {
+        filtered = filtered.replace(new RegExp(sensitive, 'gi'), safe);
+    }
+    return filtered;
+}
+
+/**
+ * AI提示词优化
+ */
+async function optimizePromptWithAI(originalPrompt, config) {
+    if (!config.optimization.enabled) {
+        return applySafetyFilter(originalPrompt);
+    }
+
+    const cleanedPrompt = originalPrompt.replace(/\(.*?\)|（.*?）/g, '').trim();
+
+    const systemPrompts = {
+        light: `You are a prompt translator for image generation AI. Translate Chinese to English, keep original meaning, remove character names. If mentions "自拍/selfie/拿着手机", ADD: "selfie", "holding phone", "phone camera view". Output ONLY English prompt.`,
+        medium: `You are a prompt optimizer for image generation. Translate Chinese to English with moderate refinement. Keep core visual elements. Replace sensitive words with safer alternatives. If mentions "自拍/selfie/拿着手机", MUST include: "selfie", "holding phone", "casual selfie angle". Output ONLY English prompt.`,
+        heavy: `You are an expert prompt optimizer focusing on content safety. Translate to concise English. Replace ALL sensitive content with safe alternatives. If mentions "自拍/selfie/拿着手机", MUST include: "selfie", "holding phone camera", "selfie perspective". For non-selfie: add "artistic", "professional photography". Output ONLY English prompt.`
+    };
+
+    const systemPrompt = systemPrompts[config.optimization.level] || systemPrompts.medium;
+
+    try {
+        const response = await fetch(`${config.optimization.apiUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${config.optimization.apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: config.optimization.model,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: cleanedPrompt }
+                ],
+                temperature: config.optimization.level === 'light' ? 0.5 : (config.optimization.level === 'medium' ? 0.4 : 0.3),
+                max_tokens: 250
+            })
+        });
+
+        if (!response.ok) throw new Error(`优化API失败: ${response.status}`);
+
+        const data = await response.json();
+        const optimized = data.choices[0].message.content.trim();
+        console.log('[提示词优化]', { original: cleanedPrompt, optimized, level: config.optimization.level });
+
+        return config.optimization.level === 'light' ? optimized : applySafetyFilter(optimized);
+    } catch (error) {
+        console.error('[提示词优化失败]', error);
+        return applySafetyFilter(originalPrompt);
+    }
+}
+
+/**
+ * Chat API图片生成
+ */
+async function callChatAPI(prompt, imageUrl, config) {
+    let imageContent = imageUrl;
+
+    if (config.chatApi.forceBase64) {
+        try {
+            imageContent = await imageUrlToBase64(imageUrl);
+        } catch (e) {
+            throw new Error(`图片转Base64失败: ${e.message}\n可尝试关闭Base64开关`);
+        }
+    }
+
+    const response = await fetch(`${config.chatApi.url}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${config.chatApi.key}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: config.chatApi.model,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'text', text: prompt },
+                    { type: 'image_url', image_url: { url: imageContent } }
+                ]
+            }],
+            size: config.chatApi.size,
+            max_tokens: 512
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Chat API请求失败 (${response.status}): ${errorText.substring(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+
+    // 提取图片URL
+    let finalUrl = null;
+    if (content.startsWith('http') || content.startsWith('data:image')) {
+        finalUrl = content.trim();
+    } else {
+        const match = content.match(/(https?:\/\/[^\s\)\]]+\.(?:jpg|jpeg|png|gif|webp|bmp))/i) ||
+                     content.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/);
+        if (match) finalUrl = match[1];
+    }
+
+    if (!finalUrl) {
+        throw new Error('Chat API响应中未找到有效的图片URL');
+    }
+
+    return { finalUrl, rawContent: content };
+}
+
+/**
+ * RunningHub API图片生成
+ */
+async function callRunningHubAPI(prompt, imageUrl, config) {
+    if (!imageUrl || !imageUrl.startsWith('http')) {
+        throw new Error(`角色图片URL无效: "${imageUrl}"`);
+    }
+
+    const { webappId, apiKey, size, aspectRatio } = config.runningHub;
+
+    // 1. 提交任务
+    const submitResponse = await fetch('https://www.runninghub.cn/task/openapi/ai-app/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            webappId,
+            apiKey,
+            nodeInfoList: [
+                { nodeId: '4', fieldName: 'image', fieldValue: imageUrl },
+                { nodeId: '6', fieldName: 'text', fieldValue: prompt },
+                { nodeId: '1', fieldName: 'size', fieldValue: size },
+                { nodeId: '37', fieldName: 'text', fieldValue: aspectRatio }
+            ]
+        })
+    });
+
+    if (!submitResponse.ok) throw new Error(`RunningHub提交失败 (${submitResponse.status})`);
+
+    const submitData = await submitResponse.json();
+    if (submitData.code !== 0 || !submitData.data?.taskId) {
+        throw new Error(`提交任务失败: ${submitData.msg}`);
+    }
+
+    const taskId = String(submitData.data.taskId);
+    console.log('[RunningHub] 任务提交成功, ID:', taskId);
+
+    // 2. 轮询状态
+    for (let i = 0; i < 30; i++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const statusResponse = await fetch('https://www.runninghub.cn/task/openapi/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey, taskId })
+        });
+
+        if (!statusResponse.ok) throw new Error('查询状态失败');
+
+        const statusData = await statusResponse.json();
+        if (statusData.code !== 0) throw new Error(`状态查询失败: ${statusData.msg}`);
+
+        console.log(`[RunningHub] 轮询 ${i+1}/30: ${statusData.data}`);
+
+        if (statusData.data === 'SUCCESS') {
+            // 3. 获取结果
+            const outputResponse = await fetch('https://www.runninghub.cn/task/openapi/outputs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey, taskId })
+            });
+
+            if (!outputResponse.ok) throw new Error('获取结果失败');
+
+            const outputData = await outputResponse.json();
+            if (outputData.code !== 0 || !Array.isArray(outputData.data) || outputData.data.length === 0) {
+                throw new Error(`获取结果失败: ${outputData.msg}`);
+            }
+
+            const finalUrl = outputData.data[0].fileUrl;
+            if (!finalUrl) throw new Error('结果中未包含图片URL');
+
+            return { finalUrl, rawContent: JSON.stringify(outputData) };
+        }
+
+        if (statusData.data === 'FAILED') {
+            throw new Error('任务执行失败');
+        }
+    }
+
+    throw new Error('任务超时(90秒)');
+}
+
+/**
+ * 主图片生成函数
+ */
+async function generateAIImage(prompt, chatId) {
+    const chat = state.chats[chatId];
+    if (!chat || !chat.settings.imageGeneration || !chat.settings.imageGeneration.enabled) {
+        throw new Error('AI图片生成未启用');
+    }
+
+    const config = chat.settings.imageGeneration;
+    if (!config.characterImageUrl) {
+        throw new Error('请先在聊天设置中配置角色图片URL');
+    }
+
+    // 读取服装描述（如果存在）
+    let enhancedPrompt = prompt;
+    const clothingElement = document.getElementById('inner-voice-clothing');
+    if (clothingElement && clothingElement.textContent.trim()) {
+        const clothingDesc = clothingElement.textContent.trim();
+        enhancedPrompt = `${prompt}。服装细节：${clothingDesc}`;
+        console.log('[服装参考]', clothingDesc);
+    }
+
+    // 优化提示词
+    const finalPrompt = await optimizePromptWithAI(enhancedPrompt, config);
+
+    // 调用对应的API
+    if (config.provider === 'runninghub') {
+        return await callRunningHubAPI(finalPrompt, config.characterImageUrl, config);
+    } else {
+        return await callChatAPI(finalPrompt, config.characterImageUrl, config);
+    }
+}
+
+/**
+ * 为图片元素添加生成按钮
+ */
+function attachImageGenerationUI(imgElement) {
+    // 修复：正确检查是否已附加UI（'false' 字符串也是 truthy）
+    if (imgElement.dataset.genUIAttached === 'true') return;
+    imgElement.dataset.genUIAttached = 'true';
+
+    const prompt = imgElement.dataset.description || imgElement.dataset.hiddenText;
+    if (!prompt) return;
+
+    const container = imgElement.parentElement;
+    if (!container) return;
+
+    // ▼▼▼ 如果图片已经生成过，直接添加重新生成按钮 ▼▼▼
+    if (imgElement.dataset.generated === 'true') {
+        // 添加点击查看功能
+        imgElement.onclick = () => {
+            const viewer = document.createElement('div');
+            viewer.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:100000;display:flex;justify-content:center;align-items:center;';
+            viewer.onclick = () => viewer.remove();
+            const viewImg = document.createElement('img');
+            viewImg.src = imgElement.src;
+            viewImg.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;';
+            viewer.appendChild(viewImg);
+            document.body.appendChild(viewer);
+        };
+
+        // 添加重新生成按钮
+        if (!container.nextElementSibling || !container.nextElementSibling.textContent.includes('重新生成')) {
+            const regenBtn = document.createElement('button');
+            regenBtn.textContent = '🔄 重新生成';
+            regenBtn.style.cssText = 'margin-top:5px;padding:6px 12px;font-size:12px;background:#6c757d;color:#fff;border:none;border-radius:6px;cursor:pointer;';
+            regenBtn.onclick = async (e) => {
+                e.stopPropagation();
+                console.log('[重新生成] 开始重新生成图片');
+
+                // 移除重新生成按钮
+                regenBtn.remove();
+
+                // 重置状态
+                delete imgElement.dataset.genUIAttached;
+                delete imgElement.dataset.generated;
+
+                // 重新添加生成UI
+                attachImageGenerationUI(imgElement);
+
+                // 等待DOM更新，然后自动触发生成
+                setTimeout(() => {
+                    const newContainer = imgElement.parentElement;
+                    const newOverlay = newContainer?.querySelector('.comfy-overlay-host');
+                    if (newOverlay) {
+                        const newGenBtn = newOverlay.querySelector('button');
+                        if (newGenBtn) {
+                            console.log('[重新生成] 自动触发生成按钮');
+                            newGenBtn.click();
+                        } else {
+                            console.warn('[重新生成] 未找到生成按钮');
+                        }
+                    } else {
+                        console.warn('[重新生成] 未找到overlay');
+                    }
+                }, 100);
+            };
+            container.after(regenBtn);
+        }
+        return;
+    }
+    // ▲▲▲ 已生成图片处理结束 ▲▲▲
+
+    // 创建覆盖层
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center;
+        z-index: 10; border-radius: inherit;
+    `;
+
+    const genBtn = document.createElement('button');
+    genBtn.textContent = '生成图片';
+    genBtn.style.cssText = `
+        padding: 10px 20px; font-size: 14px; font-weight: bold; color: #fff;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none; border-radius: 25px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+    `;
+    genBtn.onmouseover = () => genBtn.style.transform = 'scale(1.05)';
+    genBtn.onmouseout = () => genBtn.style.transform = 'scale(1)';
+
+    genBtn.onclick = async (e) => {
+        e.stopPropagation();
+
+        // 显示加载动画
+        overlay.innerHTML = '<div style="width:40px;height:40px;border:4px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></div>';
+
+        try {
+            const chatId = state.activeChatId;
+            const { finalUrl, rawContent } = await generateAIImage(prompt, chatId);
+
+            // 更新图片
+            imgElement.src = finalUrl;
+            imgElement.dataset.generated = 'true';
+            overlay.remove();
+
+            // ▼▼▼ 保存生成的图片URL到数据库 ▼▼▼
+            const msgTimestamp = imgElement.dataset.msgTimestamp;
+            if (msgTimestamp && state.chats[chatId]) {
+                const chat = state.chats[chatId];
+                const message = chat.history.find(m => m.timestamp === parseInt(msgTimestamp));
+                if (message) {
+                    message.generatedImageUrl = finalUrl;
+                    await db.chats.put(chat);
+                    console.log('[图片生成] 已保存图片URL到数据库:', { chatId, timestamp: msgTimestamp, url: finalUrl.substring(0, 100) });
+                }
+            }
+            // ▲▲▲ 保存逻辑结束 ▲▲▲
+
+            // 添加点击查看功能
+            imgElement.onclick = () => {
+                const viewer = document.createElement('div');
+                viewer.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:100000;display:flex;justify-content:center;align-items:center;';
+                viewer.onclick = () => viewer.remove();
+                const viewImg = document.createElement('img');
+                viewImg.src = finalUrl;
+                viewImg.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;';
+                viewer.appendChild(viewImg);
+                document.body.appendChild(viewer);
+            };
+
+            // 添加重新生成按钮
+            const regenBtn = document.createElement('button');
+            regenBtn.textContent = '🔄 重新生成';
+            regenBtn.style.cssText = 'margin-top:5px;padding:6px 12px;font-size:12px;background:#6c757d;color:#fff;border:none;border-radius:6px;cursor:pointer;';
+            regenBtn.onclick = async (e) => {
+                e.stopPropagation();
+                console.log('[重新生成] 开始重新生成图片');
+
+                // 移除旧按钮
+                regenBtn.remove();
+
+                // 移除可能存在的旧overlay
+                const oldOverlay = container.querySelector('.comfy-overlay-host');
+                if (oldOverlay) oldOverlay.remove();
+
+                // 重置UI状态
+                delete imgElement.dataset.genUIAttached;
+                delete imgElement.dataset.generated;
+
+                // 重新添加生成UI
+                attachImageGenerationUI(imgElement);
+
+                // 等待DOM更新后自动触发生成
+                setTimeout(() => {
+                    const newContainer = imgElement.parentElement;
+                    const newOverlay = newContainer?.querySelector('.comfy-overlay-host');
+                    if (newOverlay) {
+                        const newGenBtn = newOverlay.querySelector('button');
+                        if (newGenBtn) {
+                            console.log('[重新生成] 自动触发生成按钮');
+                            newGenBtn.click();
+                        } else {
+                            console.warn('[重新生成] 未找到生成按钮');
+                        }
+                    } else {
+                        console.warn('[重新生成] 未找到overlay');
+                    }
+                }, 100);
+            };
+            container.after(regenBtn);
+
+        } catch (error) {
+            console.error('[图片生成失败]', error);
+            overlay.innerHTML = `
+                <div style="color:#ffdddd;font-size:12px;text-align:center;padding:10px;">
+                    生成失败<br><small>${error.message}</small>
+                </div>
+            `;
+            setTimeout(() => overlay.remove(), 3000);
+        }
+    };
+
+    overlay.appendChild(genBtn);
+
+    if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+    }
+    container.appendChild(overlay);
+}
+
+/**
+ * 监听聊天中的图片元素
+ */
+function observeImagesForGeneration() {
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1) {
+                    // 查找AI生成的图片
+                    const images = node.querySelectorAll ? node.querySelectorAll('img.ai-generated-image[data-description], img.chat-image[data-hidden-text]') : [];
+                    images.forEach(img => {
+                        if (!img.dataset.genUIAttached) {
+                            attachImageGenerationUI(img);
+                        }
+                    });
+
+                    // 处理自身是图片的情况
+                    if (node.tagName === 'IMG' && (node.classList.contains('ai-generated-image') || node.classList.contains('chat-image'))) {
+                        if ((node.dataset.description || node.dataset.hiddenText) && !node.dataset.genUIAttached) {
+                            attachImageGenerationUI(node);
+                        }
+                    }
+                }
+            });
+        });
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log('[AI图片生成] 图片监听已启动');
+}
+
+// ======================================================
+// Fish Audio 语音生成
+// ======================================================
+
+/**
+ * 调用Fish Audio API生成语音
+ * @param {string} text - 要转换成语音的文本
+ * @param {Object} config - Fish Audio配置
+ * @returns {Promise<Blob>} - 返回音频Blob
+ */
+async function callFishAudioAPI(text, config) {
+    console.log('[Fish Audio] 开始生成语音:', { textLength: text.length, format: config.format });
+
+    const requestBody = {
+        text: text,
+        format: config.format || 'mp3'
+    };
+
+    // 如果有reference_id，则添加到请求中
+    if (config.referenceId && config.referenceId.trim()) {
+        requestBody.reference_id = config.referenceId.trim();
+    }
+
+    try {
+        const response = await fetch('https://api.fish.audio/v1/tts', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${config.apiKey}`,
+                'Content-Type': 'application/json',
+                'model': 's1'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Fish Audio API错误 (${response.status}): ${errorText}`);
+        }
+
+        const audioBlob = await response.blob();
+        console.log('[Fish Audio] 语音生成成功, 大小:', audioBlob.size, 'bytes');
+        return audioBlob;
+
+    } catch (error) {
+        console.error('[Fish Audio] API调用失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 为聊天消息生成语音
+ * @param {string} text - 消息文本
+ * @param {number} chatId - 聊天ID
+ * @returns {Promise<string>} - 返回音频URL
+ */
+async function generateFishAudioSpeech(text, chatId) {
+    const chat = state.chats[chatId];
+    if (!chat) {
+        throw new Error('聊天不存在');
+    }
+
+    const config = chat.settings.fishAudio;
+    if (!config || !config.enabled) {
+        throw new Error('Fish Audio未启用');
+    }
+
+    if (!config.apiKey || !config.apiKey.trim()) {
+        throw new Error('请先配置Fish Audio API Key');
+    }
+
+    if (!text || !text.trim()) {
+        throw new Error('文本内容为空');
+    }
+
+    // 调用API生成语音
+    const audioBlob = await callFishAudioAPI(text, config);
+
+    // 将Blob转换为URL
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    return audioUrl;
+}
+
+/**
+ * 播放Fish Audio生成的语音
+ * @param {string} audioUrl - 音频URL
+ * @param {HTMLElement} bubble - 消息气泡元素
+ */
+function playFishAudio(audioUrl, bubble) {
+    // 查找或创建音频播放器
+    let audioPlayer = bubble.querySelector('.fish-audio-player');
+
+    if (!audioPlayer) {
+        audioPlayer = document.createElement('audio');
+        audioPlayer.className = 'fish-audio-player';
+        audioPlayer.controls = true;
+        audioPlayer.style.cssText = `
+            width: 100%;
+            margin-top: 8px;
+            border-radius: 8px;
+        `;
+        bubble.appendChild(audioPlayer);
+    }
+
+    // 设置音频源并播放
+    audioPlayer.src = audioUrl;
+    audioPlayer.play().catch(error => {
+        console.error('[Fish Audio] 播放失败:', error);
+    });
+}
+
+// ======================================================
+// 图片生成模板管理
+// ======================================================
+
+/**
+ * 加载图片生成模板列表到下拉框
+ */
+async function loadImageGenTemplatesList() {
+    const templates = await db.imageGenTemplates.toArray();
+    const selectElement = document.getElementById('image-gen-template-select');
+
+    // 清空并重新填充
+    selectElement.innerHTML = '<option value="">-- 不使用模板 --</option>';
+
+    templates.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template.id;
+        option.textContent = template.name;
+        selectElement.appendChild(option);
+    });
+
+    console.log('[图片生成模板] 已加载', templates.length, '个模板');
+}
+
+/**
+ * 保存当前配置为模板
+ */
+async function saveAsImageGenTemplate() {
+    const templateName = prompt('请输入模板名称：');
+    if (!templateName || !templateName.trim()) {
+        return;
+    }
+
+    try {
+        // 获取当前配置
+        const provider = document.getElementById('image-api-provider').value;
+        const characterImageUrl = document.getElementById('character-image-url').value.trim();
+
+        const chatApi = {
+            url: document.getElementById('chat-image-api-url').value.trim(),
+            key: document.getElementById('chat-image-api-key').value.trim(),
+            model: document.getElementById('chat-image-model').value.trim(),
+            size: document.getElementById('chat-image-size').value,
+            forceBase64: document.getElementById('force-base64').checked
+        };
+
+        const runningHub = {
+            webappId: document.getElementById('runninghub-webapp-id').value.trim(),
+            apiKey: document.getElementById('runninghub-api-key').value.trim(),
+            size: document.getElementById('runninghub-size').value.trim(),
+            aspectRatio: document.getElementById('runninghub-aspect-ratio').value.trim()
+        };
+
+        const optimization = {
+            enabled: document.getElementById('enable-prompt-optimization').checked,
+            level: document.getElementById('optimization-level').value,
+            apiUrl: document.getElementById('optimization-api-url').value.trim(),
+            apiKey: document.getElementById('optimization-api-key').value.trim(),
+            model: document.getElementById('optimization-model').value.trim()
+        };
+
+        // 保存模板
+        const templateData = {
+            provider,
+            characterImageUrl,
+            chatApi,
+            runningHub,
+            optimization
+        };
+
+        await db.imageGenTemplates.add({
+            name: templateName.trim(),
+            data: templateData
+        });
+
+        await loadImageGenTemplatesList();
+        await showCustomAlert('保存成功', `模板"${templateName}"已保存！`);
+
+        console.log('[图片生成模板] 保存模板:', templateName, templateData);
+
+    } catch (error) {
+        console.error('[图片生成模板] 保存失败:', error);
+        await showCustomAlert('保存失败', error.message);
+    }
+}
+
+/**
+ * 加载选中的模板
+ */
+async function loadImageGenTemplate() {
+    const selectElement = document.getElementById('image-gen-template-select');
+    const templateId = parseInt(selectElement.value);
+
+    if (!templateId) {
+        await showCustomAlert('提示', '请先选择一个模板');
+        return;
+    }
+
+    try {
+        const template = await db.imageGenTemplates.get(templateId);
+        if (!template) {
+            throw new Error('模板不存在');
+        }
+
+        const data = template.data;
+
+        // 应用配置
+        document.getElementById('image-api-provider').value = data.provider || 'chat_api';
+        document.getElementById('character-image-url').value = data.characterImageUrl || '';
+
+        // Chat API 配置
+        if (data.chatApi) {
+            document.getElementById('chat-image-api-url').value = data.chatApi.url || '';
+            document.getElementById('chat-image-api-key').value = data.chatApi.key || '';
+            document.getElementById('chat-image-model').value = data.chatApi.model || '';
+            document.getElementById('chat-image-size').value = data.chatApi.size || '1024x1792';
+            document.getElementById('force-base64').checked = data.chatApi.forceBase64 !== undefined ? data.chatApi.forceBase64 : true;
+        }
+
+        // RunningHub API 配置
+        if (data.runningHub) {
+            document.getElementById('runninghub-webapp-id').value = data.runningHub.webappId || '';
+            document.getElementById('runninghub-api-key').value = data.runningHub.apiKey || '';
+            document.getElementById('runninghub-size').value = data.runningHub.size || '2K';
+            document.getElementById('runninghub-aspect-ratio').value = data.runningHub.aspectRatio || '分辨率9:16';
+        }
+
+        // 优化配置
+        if (data.optimization) {
+            document.getElementById('enable-prompt-optimization').checked = data.optimization.enabled || false;
+            document.getElementById('optimization-level').value = data.optimization.level || 'medium';
+            document.getElementById('optimization-api-url').value = data.optimization.apiUrl || '';
+            document.getElementById('optimization-api-key').value = data.optimization.apiKey || '';
+            document.getElementById('optimization-model').value = data.optimization.model || 'gpt-3.5-turbo';
+        }
+
+        // 触发UI更新
+        document.getElementById('image-api-provider').dispatchEvent(new Event('change'));
+        document.getElementById('enable-prompt-optimization').dispatchEvent(new Event('change'));
+
+        await showCustomAlert('加载成功', `已加载模板"${template.name}"的配置！`);
+
+        console.log('[图片生成模板] 加载模板:', template.name, data);
+
+    } catch (error) {
+        console.error('[图片生成模板] 加载失败:', error);
+        await showCustomAlert('加载失败', error.message);
+    }
+}
+
+/**
+ * 打开模板管理弹窗
+ */
+async function openImageGenTemplateManager() {
+    await renderImageGenTemplatesList();
+    document.getElementById('image-gen-template-manager-modal').classList.add('visible');
+}
+
+/**
+ * 渲染模板列表
+ */
+async function renderImageGenTemplatesList() {
+    const templates = await db.imageGenTemplates.toArray();
+    const listContainer = document.getElementById('image-gen-templates-list');
+
+    if (templates.length === 0) {
+        listContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">暂无模板</p>';
+        return;
+    }
+
+    listContainer.innerHTML = templates.map(template => `
+        <div class="template-item" style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 10px; background: #f9f9f9;">
+            <div>
+                <div style="font-weight: bold; margin-bottom: 5px;">${template.name}</div>
+                <div style="font-size: 12px; color: #666;">
+                    提供商: ${template.data.provider === 'chat_api' ? 'Chat API' : 'RunningHub'} |
+                    优化: ${template.data.optimization?.enabled ? '已启用' : '未启用'}
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="form-button-secondary template-load-btn" data-template-id="${template.id}" style="margin: 0; padding: 8px 15px;">加载</button>
+                <button class="form-button-secondary template-delete-btn" data-template-id="${template.id}" style="margin: 0; padding: 8px 15px; background: #ff3b30; color: white; border-color: #ff3b30;">删除</button>
+            </div>
+        </div>
+    `).join('');
+
+    // 使用事件委托处理按钮点击
+    listContainer.querySelectorAll('.template-load-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const templateId = parseInt(btn.dataset.templateId);
+            await loadTemplateById(templateId);
+        });
+    });
+
+    listContainer.querySelectorAll('.template-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const templateId = parseInt(btn.dataset.templateId);
+            await deleteImageGenTemplate(templateId);
+        });
+    });
+}
+
+/**
+ * 从管理界面加载模板
+ */
+async function loadTemplateById(templateId) {
+    try {
+        const template = await db.imageGenTemplates.get(templateId);
+        if (!template) {
+            throw new Error('模板不存在');
+        }
+
+        // 关闭模板管理弹窗
+        document.getElementById('image-gen-template-manager-modal').classList.remove('visible');
+
+        // 选中这个模板
+        document.getElementById('image-gen-template-select').value = templateId;
+
+        // 加载模板
+        await loadImageGenTemplate();
+
+    } catch (error) {
+        console.error('[图片生成模板] 加载失败:', error);
+        await showCustomAlert('加载失败', error.message);
+    }
+}
+
+/**
+ * 删除模板
+ */
+async function deleteImageGenTemplate(templateId) {
+    try {
+        const template = await db.imageGenTemplates.get(templateId);
+        if (!template) {
+            throw new Error('模板不存在');
+        }
+
+        const confirmed = await showCustomConfirm(
+            '确认删除',
+            `确定要删除模板"${template.name}"吗？此操作不可撤销。`,
+            { confirmButtonClass: 'btn-danger' }
+        );
+
+        if (!confirmed) return;
+
+        await db.imageGenTemplates.delete(templateId);
+        await renderImageGenTemplatesList();
+        await loadImageGenTemplatesList();
+
+        console.log('[图片生成模板] 删除模板:', template.name);
+
+    } catch (error) {
+        console.error('[图片生成模板] 删除失败:', error);
+        await showCustomAlert('删除失败', error.message);
+    }
+}
+
         // ===================================================================
         // 4. 初始化函数 init()
         // ===================================================================
@@ -39421,6 +40558,105 @@ document.getElementById('import-bubble-preset-input').addEventListener('change',
     }
     // ▲▲▲ NAI出图设置加载结束 ▲▲▲
 
+    // ▼▼▼ AI图片生成配置加载 ▼▼▼
+    const imageGenerationSection = document.getElementById('image-generation-details');
+    const imageGenerationToggle = document.getElementById('image-generation-toggle');
+    const imageApiProviderSelect = document.getElementById('image-api-provider');
+    const chatApiConfig = document.getElementById('chat-api-config');
+    const runningHubApiConfig = document.getElementById('runninghub-api-config');
+    const promptOptimizationConfig = document.getElementById('prompt-optimization-config');
+    const enablePromptOptimization = document.getElementById('enable-prompt-optimization');
+
+    // 只在单聊时显示图片生成配置
+    if (!isGroup) {
+        const imgGenSettings = chat.settings.imageGeneration || {};
+
+        // 加载基本配置
+        imageGenerationToggle.checked = imgGenSettings.enabled || false;
+        imageGenerationSection.style.display = imageGenerationToggle.checked ? 'block' : 'none';
+        imageApiProviderSelect.value = imgGenSettings.provider || 'chat_api';
+        document.getElementById('character-image-url').value = imgGenSettings.characterImageUrl || '';
+
+        // 加载 Chat API 配置
+        const chatApiSettings = imgGenSettings.chatApi || {};
+        document.getElementById('chat-image-api-url').value = chatApiSettings.url || 'https://tokencount.aigemini.org';
+        document.getElementById('chat-image-api-key').value = chatApiSettings.key || '';
+        document.getElementById('chat-image-model').value = chatApiSettings.model || 'gpt-4o';
+        document.getElementById('chat-image-size').value = chatApiSettings.size || '1024x1792';
+        document.getElementById('force-base64').checked = chatApiSettings.forceBase64 !== undefined ? chatApiSettings.forceBase64 : true;
+
+        // 加载 RunningHub API 配置
+        const runningHubSettings = imgGenSettings.runningHub || {};
+        document.getElementById('runninghub-webapp-id').value = runningHubSettings.webappId || '1976724532084068354';
+        document.getElementById('runninghub-api-key').value = runningHubSettings.apiKey || '3dbcc0be67b649e1b4380bfbcafc789e';
+        document.getElementById('runninghub-size').value = runningHubSettings.size || '2K';
+        document.getElementById('runninghub-aspect-ratio').value = runningHubSettings.aspectRatio || '分辨率9:16';
+
+        // 加载优化配置
+        const optimizationSettings = imgGenSettings.optimization || {};
+        enablePromptOptimization.checked = optimizationSettings.enabled || false;
+        promptOptimizationConfig.style.display = enablePromptOptimization.checked ? 'block' : 'none';
+        document.getElementById('optimization-level').value = optimizationSettings.level || 'medium';
+        document.getElementById('optimization-api-url').value = optimizationSettings.apiUrl || 'https://api.openai.com';
+        document.getElementById('optimization-api-key').value = optimizationSettings.apiKey || '';
+        document.getElementById('optimization-model').value = optimizationSettings.model || 'gpt-3.5-turbo';
+
+        // 根据provider显示/隐藏对应配置
+        chatApiConfig.style.display = imageApiProviderSelect.value === 'chat_api' ? 'block' : 'none';
+        runningHubApiConfig.style.display = imageApiProviderSelect.value === 'runninghub' ? 'block' : 'none';
+
+        // 绑定交互事件
+        imageGenerationToggle.onchange = () => {
+            imageGenerationSection.style.display = imageGenerationToggle.checked ? 'block' : 'none';
+        };
+
+        imageApiProviderSelect.onchange = () => {
+            chatApiConfig.style.display = imageApiProviderSelect.value === 'chat_api' ? 'block' : 'none';
+            runningHubApiConfig.style.display = imageApiProviderSelect.value === 'runninghub' ? 'block' : 'none';
+        };
+
+        enablePromptOptimization.onchange = () => {
+            promptOptimizationConfig.style.display = enablePromptOptimization.checked ? 'block' : 'none';
+        };
+
+        // 加载图片生成模板列表
+        await loadImageGenTemplatesList();
+
+        console.log('[AI图片生成] 加载配置:', imgGenSettings);
+    }
+    // ▲▲▲ AI图片生成配置加载结束 ▲▲▲
+
+    // ▼▼▼ Fish Audio语音生成配置加载 ▼▼▼
+    const fishAudioConfigGroup = document.getElementById('fish-audio-config-group');
+    const fishAudioToggle = document.getElementById('fish-audio-toggle');
+    const fishAudioDetails = document.getElementById('fish-audio-details');
+
+    // 只在单聊时显示Fish Audio配置
+    if (!isGroup) {
+        fishAudioConfigGroup.style.display = 'block';
+        const fishAudioSettings = chat.settings.fishAudio || {};
+
+        // 加载基本配置
+        fishAudioToggle.checked = fishAudioSettings.enabled || false;
+        fishAudioDetails.style.display = fishAudioToggle.checked ? 'block' : 'none';
+
+        // 加载API配置
+        document.getElementById('fish-audio-api-key').value = fishAudioSettings.apiKey || '';
+        document.getElementById('fish-audio-reference-id').value = fishAudioSettings.referenceId || '';
+        document.getElementById('fish-audio-format').value = fishAudioSettings.format || 'mp3';
+        document.getElementById('fish-audio-auto-generate').checked = fishAudioSettings.autoGenerate || false;
+
+        // 绑定交互事件
+        fishAudioToggle.onchange = () => {
+            fishAudioDetails.style.display = fishAudioToggle.checked ? 'block' : 'none';
+        };
+
+        console.log('[Fish Audio] 加载配置:', fishAudioSettings);
+    } else {
+        fishAudioConfigGroup.style.display = 'none';
+    }
+    // ▲▲▲ Fish Audio语音生成配置加载结束 ▲▲▲
+
     // ▼▼▼ 群聊NAI出图设置的显示/隐藏和加载 ▼▼▼
     const groupNaiSettingsGroup = document.getElementById('group-nai-settings-group');
     if (isGroup && novelaiEnabled) {
@@ -39881,7 +41117,62 @@ chat.settings.userVideoImage = document.getElementById('user-video-image-preview
             // 角色专属提示词已经在专属弹窗中保存，这里只保存来源选择
         }
         // ▲▲▲ NAI出图设置保存结束 ▲▲▲
-        
+
+        // ▼▼▼ 保存AI图片生成配置 ▼▼▼
+        if (!chat.settings.imageGeneration) {
+            chat.settings.imageGeneration = {};
+        }
+
+        chat.settings.imageGeneration.enabled = document.getElementById('image-generation-toggle').checked;
+        chat.settings.imageGeneration.provider = document.getElementById('image-api-provider').value;
+        chat.settings.imageGeneration.characterImageUrl = document.getElementById('character-image-url').value.trim();
+
+        // Chat API 配置
+        if (!chat.settings.imageGeneration.chatApi) {
+            chat.settings.imageGeneration.chatApi = {};
+        }
+        chat.settings.imageGeneration.chatApi.url = document.getElementById('chat-image-api-url').value.trim();
+        chat.settings.imageGeneration.chatApi.key = document.getElementById('chat-image-api-key').value.trim();
+        chat.settings.imageGeneration.chatApi.model = document.getElementById('chat-image-model').value.trim();
+        chat.settings.imageGeneration.chatApi.size = document.getElementById('chat-image-size').value;
+        chat.settings.imageGeneration.chatApi.forceBase64 = document.getElementById('force-base64').checked;
+
+        // RunningHub API 配置
+        if (!chat.settings.imageGeneration.runningHub) {
+            chat.settings.imageGeneration.runningHub = {};
+        }
+        chat.settings.imageGeneration.runningHub.webappId = document.getElementById('runninghub-webapp-id').value.trim();
+        chat.settings.imageGeneration.runningHub.apiKey = document.getElementById('runninghub-api-key').value.trim();
+        chat.settings.imageGeneration.runningHub.size = document.getElementById('runninghub-size').value.trim();
+        chat.settings.imageGeneration.runningHub.aspectRatio = document.getElementById('runninghub-aspect-ratio').value.trim();
+
+        // 提示词优化配置
+        if (!chat.settings.imageGeneration.optimization) {
+            chat.settings.imageGeneration.optimization = {};
+        }
+        chat.settings.imageGeneration.optimization.enabled = document.getElementById('enable-prompt-optimization').checked;
+        chat.settings.imageGeneration.optimization.level = document.getElementById('optimization-level').value;
+        chat.settings.imageGeneration.optimization.apiUrl = document.getElementById('optimization-api-url').value.trim();
+        chat.settings.imageGeneration.optimization.apiKey = document.getElementById('optimization-api-key').value.trim();
+        chat.settings.imageGeneration.optimization.model = document.getElementById('optimization-model').value.trim();
+
+        console.log('[AI图片生成] 保存配置:', chat.settings.imageGeneration);
+        // ▲▲▲ AI图片生成配置保存结束 ▲▲▲
+
+        // ▼▼▼ 保存Fish Audio语音生成配置 ▼▼▼
+        if (!chat.settings.fishAudio) {
+            chat.settings.fishAudio = {};
+        }
+
+        chat.settings.fishAudio.enabled = document.getElementById('fish-audio-toggle').checked;
+        chat.settings.fishAudio.apiKey = document.getElementById('fish-audio-api-key').value.trim();
+        chat.settings.fishAudio.referenceId = document.getElementById('fish-audio-reference-id').value.trim();
+        chat.settings.fishAudio.format = document.getElementById('fish-audio-format').value;
+        chat.settings.fishAudio.autoGenerate = document.getElementById('fish-audio-auto-generate').checked;
+
+        console.log('[Fish Audio] 保存配置:', chat.settings.fishAudio);
+        // ▲▲▲ Fish Audio语音生成配置保存结束 ▲▲▲
+
         const selectedGroupId = document.getElementById('assign-group-select').value;
         chat.groupId = selectedGroupId ? parseInt(selectedGroupId) : null;
     }
@@ -41692,49 +42983,118 @@ document.getElementById('close-transcript-modal-btn').addEventListener('click', 
 
 // ▲▲▲ 替换结束 ▲▲▲
 
-document.getElementById('chat-messages').addEventListener('click', (e) => {
+document.getElementById('chat-messages').addEventListener('click', async (e) => {
     // 1. 检查点击的是否是语音条
     const voiceBody = e.target.closest('.voice-message-body');
     if (!voiceBody) return;
 
+    console.log('[语音条点击] 检测到点击');
+
     // 2. 找到相关的DOM元素
     const bubble = voiceBody.closest('.message-bubble');
     if (!bubble) return;
-    
+
     const spinner = voiceBody.querySelector('.loading-spinner');
     const transcriptEl = bubble.querySelector('.voice-transcript');
 
     // 如果正在加载中，则不响应点击
     if (bubble.dataset.state === 'loading') {
+        console.log('[语音条点击] 正在加载中，跳过');
         return;
     }
 
     // 3. 如果文字已经展开，则收起
     if (bubble.dataset.state === 'expanded') {
+        console.log('[语音条点击] 收起文字');
         transcriptEl.style.display = 'none';
         bubble.dataset.state = 'collapsed';
-    } 
-    // 4. 如果是收起状态，则开始“转录”流程
-    else {
-        bubble.dataset.state = 'loading'; // 进入加载状态
-        spinner.style.display = 'block';   // 显示加载动画
-
-        // 模拟1.5秒的语音识别过程
-        setTimeout(() => {
-            // 检查此时元素是否还存在（可能用户已经切换了聊天）
-            if (document.body.contains(bubble)) {
-                const voiceText = bubble.dataset.voiceText || '(无法识别)';
-                transcriptEl.textContent = voiceText; // 填充文字
-                
-                spinner.style.display = 'none';      // 隐藏加载动画
-                transcriptEl.style.display = 'block';// 显示文字
-                bubble.dataset.state = 'expanded';     // 进入展开状态
-            }
-        }, 500);
+        return;
     }
+
+    // 4. 如果是收起状态，则开始"转录"流程
+    bubble.dataset.state = 'loading'; // 进入加载状态
+    spinner.style.display = 'block';   // 显示加载动画
+
+    const voiceText = bubble.dataset.voiceText || '(无法识别)';
+    console.log('[语音条点击] 语音文本:', voiceText);
+
+    // ▼▼▼ Fish Audio 语音生成逻辑 ▼▼▼
+    // 检查是否是AI消息且启用了Fish Audio
+    const chatId = state.activeChatId;
+    const chat = state.chats[chatId];
+    const wrapper = bubble.closest('.message-wrapper');
+    const isAIMessage = wrapper && wrapper.classList.contains('ai');
+    const fishAudioEnabled = chat?.settings?.fishAudio?.enabled;
+
+    console.log('[Fish Audio] 检查条件:', {
+        isAIMessage,
+        fishAudioEnabled,
+        hasApiKey: !!chat?.settings?.fishAudio?.apiKey,
+        hasReferenceId: !!chat?.settings?.fishAudio?.referenceId
+    });
+
+    // 如果是AI消息且启用了Fish Audio，同时生成语音
+    if (isAIMessage && fishAudioEnabled && voiceText) {
+        const timestamp = bubble.dataset.timestamp;
+        const message = chat.history.find(m => m.timestamp === parseInt(timestamp));
+
+        console.log('[Fish Audio] 找到消息:', !!message);
+
+        // 异步生成语音（不阻塞文字显示）
+        if (message) {
+            // 如果已经有生成的语音，直接播放
+            if (message.generatedAudioUrl) {
+                console.log('[Fish Audio] 使用已缓存的语音');
+                setTimeout(() => {
+                    playFishAudio(message.generatedAudioUrl, bubble);
+                }, 600); // 等待文字显示动画完成后播放
+            } else {
+                // 生成新语音
+                console.log('[Fish Audio] 点击语音条，开始生成语音');
+                generateFishAudioSpeech(voiceText, chatId)
+                    .then(async audioUrl => {
+                        // 保存到数据库
+                        message.generatedAudioUrl = audioUrl;
+                        await db.chats.put(chat);
+
+                        console.log('[Fish Audio] 语音生成成功并开始播放');
+
+                        // 播放语音
+                        playFishAudio(audioUrl, bubble);
+                    })
+                    .catch(error => {
+                        console.error('[Fish Audio] 语音生成失败:', error);
+                        // 不显示错误提示，因为文字已经正常显示了
+                    });
+            }
+        }
+    }
+    // ▲▲▲ Fish Audio 语音生成逻辑结束 ▲▲▲
+
+    // 文本转录逻辑（总是执行）
+    setTimeout(() => {
+        // 检查此时元素是否还存在（可能用户已经切换了聊天）
+        if (document.body.contains(bubble)) {
+            transcriptEl.textContent = voiceText; // 填充文字
+
+            spinner.style.display = 'none';      // 隐藏加载动画
+            transcriptEl.style.display = 'block';// 显示文字
+            bubble.dataset.state = 'expanded';     // 进入展开状态
+            console.log('[语音条点击] 文字已展开');
+        }
+    }, 500);
 });
 
 document.getElementById('chat-header-status').addEventListener('click', handleEditStatusClick);
+
+// ▼▼▼ 图片生成模板管理事件监听 ▼▼▼
+document.getElementById('save-as-image-gen-template-btn').addEventListener('click', saveAsImageGenTemplate);
+document.getElementById('load-image-gen-template-btn').addEventListener('click', loadImageGenTemplate);
+document.getElementById('manage-image-gen-templates-btn').addEventListener('click', openImageGenTemplateManager);
+document.getElementById('close-image-gen-template-manager-btn').addEventListener('click', () => {
+    document.getElementById('image-gen-template-manager-modal').classList.remove('visible');
+});
+// ▲▲▲ 图片生成模板管理事件监听结束 ▲▲▲
 
 // 在 init() 的事件监听器区域添加
 document.getElementById('selection-share-btn').addEventListener('click', () => {
@@ -44549,6 +45909,13 @@ setTimeout(async () => {
     }
 }, 5000);
 // ▲▲▲ 自动加载预设结束 ▲▲▲
+
+// ▼▼▼ 启动AI图片生成监听 ▼▼▼
+// 延迟1秒后启动图片监听，确保DOM已完全加载
+setTimeout(() => {
+    observeImagesForGeneration();
+}, 1000);
+// ▲▲▲ 图片生成监听启动 ▲▲▲
 
         }
 
