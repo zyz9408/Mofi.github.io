@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(index.html)",
+      "Bash(cat:*)",
+      "Bash(\"e:\\Mofi.github.io\\default-preset.json\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
