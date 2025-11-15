@@ -10350,7 +10350,7 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
         };
 
         const [
-            chats, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
+            chatsRaw, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
             personaPresets, musicLibrary, qzoneSettings, qzonePosts,
             qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories,
             worldBookCategories, callRecords, customAvatarFrames, themes,
@@ -10397,6 +10397,27 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
             db.userWalletTransactions.toArray(),
             db.userStickerCategories.toArray()
         ]);
+
+        // ▼▼▼ 清理音频数据以减小备份文件大小 ▼▼▼
+        // 深拷贝chats数据，并移除语音消息中的音频base64数据
+        const chats = chatsRaw.map(chat => {
+            const chatCopy = JSON.parse(JSON.stringify(chat));
+            if (chatCopy.history && Array.isArray(chatCopy.history)) {
+                let removedCount = 0;
+                chatCopy.history.forEach(msg => {
+                    if (msg.generatedAudioUrl) {
+                        delete msg.generatedAudioUrl;
+                        removedCount++;
+                    }
+                });
+                if (removedCount > 0) {
+                    console.log(`[备份] ${chat.name}: 已移除 ${removedCount} 条音频数据以减小文件大小`);
+                }
+            }
+            return chatCopy;
+        });
+        console.log('[备份] 音频数据已清理，仅保留Fish Audio配置信息');
+        // ▲▲▲ 音频数据清理结束 ▲▲▲
 
         Object.assign(backupData, {
             chats, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
@@ -10473,6 +10494,10 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
         // 2. 上传到 WebDAV
         const jsonString = JSON.stringify(backupData, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
+
+        // 显示文件大小信息
+        const fileSizeMB = (blob.size / 1024 / 1024).toFixed(2);
+        console.log(`[备份] 备份文件大小: ${fileSizeMB} MB (${blob.size} bytes)`);
 
         const uploadUrl = DAV_CONFIG.baseUrl + DAV_CONFIG.path;
         const authString = btoa(`${DAV_CONFIG.username}:${DAV_CONFIG.password}`);
