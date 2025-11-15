@@ -10213,22 +10213,11 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
 }
 
 async function downloadBackupFromKodboxViaWebDAV() {
-    const DAV_CONFIG = {
-        baseUrl: 'https://mofi1994.xyz/index.php/dav/my/',
-        path: 'backups/ephoneNew.json',
-        username: 'zyz9408',
-        password: 'a600422mm',
-    };
+    const BACKUP_URL = 'https://mofi1994.xyz/?explorer/share/file&hash=8d39Akoz1fZQVvKlt2nEniKquf5gllQEy7TBsIQxGWd5WI_VTjWNlDC71yAnnFp0OQ&name=/ephoneBase.json';
 
     try {
-        const downloadUrl = DAV_CONFIG.baseUrl + DAV_CONFIG.path;
-        const authString = btoa(`${DAV_CONFIG.username}:${DAV_CONFIG.password}`);
-
-        const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Basic ${authString}`
-            }
+        const response = await fetch(BACKUP_URL, {
+            method: 'GET'
         });
 
         if (!response.ok) {
