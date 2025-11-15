@@ -10398,29 +10398,8 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
             db.userStickerCategories.toArray()
         ]);
 
-        // ▼▼▼ 清理音频数据以减小备份文件大小 ▼▼▼
-        // 深拷贝chats数据，并移除语音消息中的音频base64数据
-        const chats = chatsRaw.map(chat => {
-            const chatCopy = JSON.parse(JSON.stringify(chat));
-            if (chatCopy.history && Array.isArray(chatCopy.history)) {
-                let removedCount = 0;
-                chatCopy.history.forEach(msg => {
-                    if (msg.generatedAudioUrl) {
-                        delete msg.generatedAudioUrl;
-                        removedCount++;
-                    }
-                });
-                if (removedCount > 0) {
-                    console.log(`[备份] ${chat.name}: 已移除 ${removedCount} 条音频数据以减小文件大小`);
-                }
-            }
-            return chatCopy;
-        });
-        console.log('[备份] 音频数据已清理，仅保留Fish Audio配置信息');
-        // ▲▲▲ 音频数据清理结束 ▲▲▲
-
         Object.assign(backupData, {
-            chats, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
+            chats: chatsRaw, worldBooks, userStickers, charStickers, apiConfig, globalSettings,
             personaPresets, musicLibrary, qzoneSettings, qzonePosts,
             qzoneAlbums, qzonePhotos, favorites, qzoneGroups, memories,
             worldBookCategories, callRecords, customAvatarFrames, themes,
@@ -10431,7 +10410,7 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
         });
 
         // ▼▼▼ 验证并记录图片生成配置的上传 ▼▼▼
-        const chatsWithImageGen = chats.filter(chat => chat.settings?.imageGeneration?.enabled);
+        const chatsWithImageGen = chatsRaw.filter(chat => chat.settings?.imageGeneration?.enabled);
         if (chatsWithImageGen.length > 0) {
             console.log(`[KOD云备份] 已包含 ${chatsWithImageGen.length} 个角色的AI图片生成配置:`,
                 chatsWithImageGen.map(c => ({
@@ -10444,7 +10423,7 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
         // ▲▲▲ 图片生成配置验证结束 ▲▲▲
 
         // ▼▼▼ 验证并记录Fish Audio语音生成配置的上传 ▼▼▼
-        const chatsWithFishAudio = chats.filter(chat => chat.settings?.fishAudio?.enabled);
+        const chatsWithFishAudio = chatsRaw.filter(chat => chat.settings?.fishAudio?.enabled);
         if (chatsWithFishAudio.length > 0) {
             console.log(`[KOD云备份] 已包含 ${chatsWithFishAudio.length} 个角色的Fish Audio语音生成配置:`,
                 chatsWithFishAudio.map(c => ({
@@ -10523,9 +10502,31 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
 
     } catch (error) {
         console.error("上传备份到 KOD 云时出错:", error);
+
+        // 如果上传失败（如文件过大），提供下载到本地的选项
         if (showAlerts) {
-            await showCustomAlert('上传失败', `发生了一个错误: ${error.message}`);
+            const shouldDownload = await showCustomConfirm(
+                '云端上传失败',
+                `上传到KOD云失败: ${error.message}\n\n文件大小: ${(blob.size / 1024 / 1024).toFixed(2)} MB\n\n可能原因：\n1. 服务器上传大小限制（需要调整 upload_max_filesize 和 post_max_size）\n2. 网络连接问题\n\n是否下载备份文件到本地？`,
+                { confirmButtonText: '下载到本地', cancelButtonText: '取消' }
+            );
+
+            if (shouldDownload) {
+                // 创建下载链接
+                const downloadUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `ephone-backup-${Date.now()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+
+                await showCustomAlert('下载成功', '备份文件已下载到本地！');
+                return true;
+            }
         }
+
         throw error;
     }
 }
