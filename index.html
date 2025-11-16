@@ -7428,22 +7428,34 @@ async function renderMyWeiboFeed() {
     const posts = await db.weiboPosts.where('authorId').equals('user').reverse().toArray();
     feedEl.innerHTML = '';
     if (posts.length === 0) {
-        feedEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">你还没有发过微博哦，点击右上角“+”试试吧！</p>';
+        feedEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">你还没有发过微博哦，点击右上角"+"试试吧！</p>';
         return;
     }
     posts.forEach(post => {
         // 【核心修改】调用我们新的专属函数！
         feedEl.appendChild(createWeiboPostElement(post));
     });
+
+    // ▼▼▼ 【修复】手动为所有text_image类型的图片附加生成UI ▼▼▼
+    setTimeout(() => {
+        const images = feedEl.querySelectorAll('img.chat-image[data-hidden-text]');
+        images.forEach(img => {
+            if (!img.dataset.genUIAttached && typeof attachImageGenerationUI === 'function') {
+                attachImageGenerationUI(img);
+            }
+        });
+        console.log(`[微博] 已为 ${images.length} 张图片添加生成UI`);
+    }, 100);
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 
 // ▼▼▼ 用这块【已修复】的代码，完整替换掉你旧的 renderFollowingWeiboFeed 函数 ▼▼▼
 /**
- * 【微博】渲染“关注的人”的微博Feed (已修复卡顿问题)
+ * 【微博】渲染"关注的人"的微博Feed (已修复卡顿问题)
  */
 async function renderFollowingWeiboFeed() {
     const feedEl = document.getElementById('weibo-following-feed-list');
-    
+
     // 【核心优化】我们不再一次性读取所有帖子，而是直接让数据库帮我们筛选和排序，速度会快很多！
     const posts = await db.weiboPosts
         .where('authorId').notEqual('user') // 1. 直接在数据库层面，找出作者不是'user'的帖子
@@ -7459,6 +7471,18 @@ async function renderFollowingWeiboFeed() {
     posts.forEach(post => {
         feedEl.appendChild(createWeiboPostElement(post));
     });
+
+    // ▼▼▼ 【修复】手动为所有text_image类型的图片附加生成UI ▼▼▼
+    setTimeout(() => {
+        const images = feedEl.querySelectorAll('img.chat-image[data-hidden-text]');
+        images.forEach(img => {
+            if (!img.dataset.genUIAttached && typeof attachImageGenerationUI === 'function') {
+                attachImageGenerationUI(img);
+            }
+        });
+        console.log(`[关注微博] 已为 ${images.length} 张图片添加生成UI`);
+    }, 100);
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 
 
@@ -7475,7 +7499,9 @@ function createWeiboPostElement(post) {
     
     if (post.imageUrl) {
         if (post.postType === 'text_image') {
-            contentHtml += `<img src="${post.imageUrl}" class="weibo-post-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent || ''}">`;
+            // ▼▼▼ 【修复】添加 chat-image 类以支持AI图片生成，并添加 data-chat-id 属性 ▼▼▼
+            contentHtml += `<img src="${post.imageUrl}" class="weibo-post-image chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent || ''}" data-chat-id="${post.authorId}">`;
+            // ▲▲▲ 修复结束 ▲▲▲
         } else {
             contentHtml += `<img src="${post.imageUrl}" class="weibo-post-image">`;
         }
@@ -9802,10 +9828,10 @@ posts.forEach(post => {
         contentHtml = `<div class="post-content" style="margin-bottom: 10px;">${post.content.replace(/\n/g, '<br>')}</div>`;
     } 
     else if (post.type === 'image_post' && post.imageUrl) {
-        contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="${post.imageUrl}" class="chat-image"></div>` : `<img src="${post.imageUrl}" class="chat-image">`;
-    } 
+        contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="${post.imageUrl}" class="chat-image" data-chat-id="${post.authorId}"></div>` : `<img src="${post.imageUrl}" class="chat-image" data-chat-id="${post.authorId}">`;
+    }
     else if (post.type === 'text_image') {
-        contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}"></div>` : `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}">`;
+        contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}" data-chat-id="${post.authorId}"></div>` : `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}" data-chat-id="${post.authorId}">`;
     }
     else if (post.type === 'realimag') {
         // RealImag真实图片动态渲染（支持多图布局）
@@ -9969,6 +9995,18 @@ posts.forEach(post => {
             commentInput.addEventListener('blur', () => { setTimeout(() => { popup.style.display = 'none'; }, 200); });
         }
     });
+
+    // ▼▼▼ 【修复】手动为所有text_image类型的图片附加生成UI ▼▼▼
+    setTimeout(() => {
+        const images = postsListEl.querySelectorAll('img.chat-image[data-hidden-text]');
+        images.forEach(img => {
+            if (!img.dataset.genUIAttached && typeof attachImageGenerationUI === 'function') {
+                attachImageGenerationUI(img);
+            }
+        });
+        console.log(`[QQ空间动态] 已为 ${images.length} 张图片添加生成UI`);
+    }, 100);
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 // ▲▲▲ 步骤3.1替换结束 ▲▲▲
 async function renderFollowingFeed() {
@@ -10037,9 +10075,9 @@ function displayFilteredFavorites(items) {
             if (post.type === 'shuoshuo') {
                 contentHtml = `<div class="post-content">${post.content.replace(/\n/g, '<br>')}</div>`;
             } else if (post.type === 'image_post' && post.imageUrl) {
-                contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="${post.imageUrl}" class="chat-image"></div>` : `<img src="${post.imageUrl}" class="chat-image">`;
+                contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="${post.imageUrl}" class="chat-image" data-chat-id="${post.authorId}"></div>` : `<img src="${post.imageUrl}" class="chat-image" data-chat-id="${post.authorId}">`;
             } else if (post.type === 'text_image') {
-                contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}"></div>` : `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}">`;
+                contentHtml = publicTextHtml ? `${publicTextHtml}<div style="margin-top:10px;"><img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}" data-chat-id="${post.authorId}"></div>` : `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}" data-chat-id="${post.authorId}">`;
             } else if (post.type === 'realimag') {
                 // RealImag真实图片动态渲染（支持多图布局）
                 const imageUrls = post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
@@ -10186,9 +10224,21 @@ function displayFilteredFavorites(items) {
             <div class="fav-card-header">${headerHtml}<div class="source">${sourceText}</div></div>
             <div class="fav-card-content">${contentHtml}</div>
             ${footerHtml}`; // <-- 把我们新创建的 footerHtml 放在这里
-            
+
         listEl.appendChild(card);
     }
+
+    // ▼▼▼ 【修复】手动为收藏夹中所有text_image类型的图片附加生成UI ▼▼▼
+    setTimeout(() => {
+        const images = listEl.querySelectorAll('img.chat-image[data-hidden-text]');
+        images.forEach(img => {
+            if (!img.dataset.genUIAttached && typeof attachImageGenerationUI === 'function') {
+                attachImageGenerationUI(img);
+            }
+        });
+        console.log(`[收藏夹] 已为 ${images.length} 张图片添加生成UI`);
+    }, 100);
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 
 // ▲▲▲ 替换区域结束 ▲▲▲
@@ -10583,7 +10633,7 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
 }
 
 async function downloadBackupFromKodboxViaWebDAV() {
-    const BACKUP_URL = 'https://mofi1994.xyz/?explorer/share/file&hash=42f8rSj9wca5IO0Tjr76olWYRgPlgtNIIKPn_abwLwyQIlDsE5xO0UGFNpKWmVKq7Q&name=/ephoneBase.json';
+    const BACKUP_URL = 'https://mofi1994.xyz/?explorer/share/file&hash=bd3fJ9lTjRQOcB5QE7Ls8jyOa2TmUggp7u0XwXtOGQW2WdzVz_scZV8J-uvSbibWYA&name=/ephoneBase.json';
 
     try {
         const response = await fetch(BACKUP_URL, {
@@ -27111,9 +27161,9 @@ const items = state.chats[activeCharacterPhoneId]?.characterPhoneData?.photoAlbu
         const itemEl = document.createElement('div');
         itemEl.className = 'character-album-item';
         itemEl.style.position = 'relative';
-        // ▼▼▼ 【关键修改】添加 chat-image 类和 data-hidden-text 属性，让脚本能识别并生成图片 ▼▼▼
+        // ▼▼▼ 【关键修改】添加 chat-image 类和 data-hidden-text 属性，以及 data-chat-id 属性 ▼▼▼
         itemEl.innerHTML = `
-            <img src="https://i.postimg.cc/KYr2qRCK/1.jpg" alt="文字图" class="chat-image" data-hidden-text="${item.hiddenContent}" style="cursor: pointer;">
+            <img src="https://i.postimg.cc/KYr2qRCK/1.jpg" alt="文字图" class="chat-image" data-hidden-text="${item.hiddenContent}" data-chat-id="${activeCharacterPhoneId}" style="cursor: pointer;">
             <button class="item-delete-btn" data-type="photoAlbum" data-index="${index}" style="top: 10px; right: 10px; z-index: 1;">×</button>
         `;
         // ▲▲▲ 修改结束 ▲▲▲
@@ -27123,6 +27173,18 @@ const items = state.chats[activeCharacterPhoneId]?.characterPhoneData?.photoAlbu
         });
         gridEl.appendChild(itemEl);
     });
+
+    // ▼▼▼ 【修复】手动为所有图片附加生成UI ▼▼▼
+    setTimeout(() => {
+        const images = gridEl.querySelectorAll('img.chat-image[data-hidden-text]');
+        images.forEach(img => {
+            if (!img.dataset.genUIAttached && typeof attachImageGenerationUI === 'function') {
+                attachImageGenerationUI(img);
+            }
+        });
+        console.log(`[相册] 已为 ${images.length} 张图片添加生成UI`);
+    }, 100);
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 
 
@@ -32614,9 +32676,9 @@ async function renderWeiboCharProfile(charId) {
 async function renderCharSpecificFeed(charId) {
     const feedEl = document.getElementById('char-weibo-feed-list');
     feedEl.innerHTML = '';
-    
+
     const posts = await db.weiboPosts.where('authorId').equals(charId).reverse().sortBy('timestamp');
-    
+
     if (posts.length === 0) {
         feedEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">Ta 还没有发过微博哦。</p>';
         return;
@@ -32626,6 +32688,18 @@ async function renderCharSpecificFeed(charId) {
         // 复用我们强大的微博帖子创建函数
         feedEl.appendChild(createWeiboPostElement(post));
     });
+
+    // ▼▼▼ 【修复】手动为所有text_image类型的图片附加生成UI ▼▼▼
+    setTimeout(() => {
+        const images = feedEl.querySelectorAll('img.chat-image[data-hidden-text]');
+        images.forEach(img => {
+            if (!img.dataset.genUIAttached && typeof attachImageGenerationUI === 'function') {
+                attachImageGenerationUI(img);
+            }
+        });
+        console.log(`[角色微博] 已为 ${images.length} 张图片添加生成UI`);
+    }, 100);
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 
 /**
@@ -38778,7 +38852,8 @@ function attachImageGenerationUI(imgElement) {
         overlay.innerHTML = '<div style="width:40px;height:40px;border:4px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></div>';
 
         try {
-            const chatId = state.activeChatId;
+            // 优先使用图片元素上的 data-chat-id，这样可以调用对应角色的生图API设置
+            const chatId = imgElement.dataset.chatId || state.activeChatId;
             const { finalUrl, rawContent } = await generateAIImage(prompt, chatId);
 
             // 更新图片
