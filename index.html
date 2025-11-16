@@ -81,6 +81,34 @@
         .voice-regenerate-btn svg {
             display: block;
         }
+
+        /* 桌面应用容器 - 支持纵向滚动的3x3网格布局 */
+        #desktop-app-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3列布局 */
+            gap: 15px; /* 图标之间的间距 */
+            padding: 10px 15px; /* 内边距 */
+            overflow-x: hidden; /* 隐藏横向滚动 */
+            overflow-y: auto; /* 纵向滚动 */
+            -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+            scroll-behavior: smooth; /* 平滑滚动效果 */
+            max-height: calc(100vh - 320px); /* 限制高度，露出下方一半图标 */
+            -ms-overflow-style: none; /* IE 和 Edge 隐藏滚动条 */
+            scrollbar-width: none; /* Firefox 隐藏滚动条 */
+        }
+
+        /* 隐藏滚动条，但保持滚动功能 (WebKit浏览器) */
+        #desktop-app-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 确保图标样式正常 */
+        #desktop-app-container .desktop-app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
     <!-- ▼▼▼ 在这里添加下面这行 ▼▼▼ -->
     <style id="custom-theme-style"></style>
@@ -159,37 +187,57 @@
                             <div id="widget-subtext-2" class="widget-subtext editable-text" contenteditable="true">点击编辑文字</div>
                         </div>
                     </div>
+                    <!-- 桌面应用容器 - 包含所有主要应用图标 -->
                     <div id="desktop-app-container">
+                        <!-- QQ应用 - 聊天列表入口 -->
                         <div class="desktop-app-icon" onclick="showScreen('chat-list-screen')"><div class="icon-bg-desktop"><img id="icon-img-qq" src="https://i.postimg.cc/MTC3Tkw8/IMG-6436.jpg" alt="QQ"></div><span class="label">QQ</span></div>
+
+                        <!-- 世界书应用 - 知识百科功能 -->
                         <div class="desktop-app-icon" onclick="showScreen('world-book-screen')"><div class="icon-bg-desktop"><img id="icon-img-world-book" src="https://i.postimg.cc/HWf1JKzn/IMG-6435.jpg" alt="世界书"></div><span class="label">世界书</span></div>
+
+                        <!-- 查手机应用 - 手机状态查看 -->
                         <div id="check-phone-btn" class="desktop-app-icon">
                             <div class="icon-bg-desktop"><img id="icon-img-check-phone" src="https://i.postimg.cc/RVwpwr0r/IMG-8348.jpg" alt="查手机"></div>
                             <span class="label">查手机</span>
                         </div>
+
+                        <!-- 微博应用 - 社交分享平台 -->
                         <div class="desktop-app-icon" id="weibo-app-icon">
                             <div class="icon-bg-desktop"><img id="icon-img-weibo" src="https://i.postimg.cc/PqBY5wBq/weibo-icon.png" alt="微博"></div>
                             <span class="label">微博</span>
                         </div>
+
+                        <!-- 圈子应用 - 论坛社区功能 -->
                         <div class="desktop-app-icon" onclick="showScreen('forum-screen')">
                             <div class="icon-bg-desktop"><img id="icon-img-forum" src="https://i.postimg.cc/pr0T3WfC/douban-icon.png" alt="圈子"></div>
                             <span class="label">圈子</span>
                         </div>
+
+                        <!-- 情侣空间应用 - 情侣互动专区 -->
                         <div class="desktop-app-icon" id="lovers-space-app-icon">
                             <div class="icon-bg-desktop"><img id="icon-img-lovers-space" src="https://i.postimg.cc/d1wZ39xW/lovers-space-icon.png" alt="情侣空间"></div>
                             <span class="label">情侣空间</span>
                         </div>
+
+                        <!-- X社交应用 - 国际社交平台 -->
                         <div class="desktop-app-icon" onclick="showScreen('x-social-screen')">
                             <div class="icon-bg-desktop"><img id="icon-img-x-social" src="https://i.postimg.cc/8P1H0vQ8/x-logo.png" alt="X社交"></div>
                             <span class="label">X社交</span>
                         </div>
+
+                        <!-- 游戏大厅应用 - 游戏中心入口 -->
                         <div class="desktop-app-icon" onclick="showScreen('game-hall-screen')">
                             <div class="icon-bg-desktop"><img id="icon-img-game-hall" src="https://i.postimg.cc/P5gL5z2g/game-controller-icon.png" alt="游戏大厅"></div>
                             <span class="label">游戏大厅</span>
                         </div>
+
+                        <!-- 桃宝应用 - 购物平台 -->
                         <div class="desktop-app-icon" id="taobao-app-icon">
                             <div class="icon-bg-desktop"><img id="icon-img-taobao" src="https://i.postimg.cc/k47tXg1j/taologo.png" alt="桃宝"></div>
                             <span class="label">桃宝</span>
                         </div>
+
+                        <!-- 约会大作战应用 - 主题游戏/内容 -->
                         <div class="desktop-app-icon" id="date-a-live-app-icon">
                             <div class="icon-bg-desktop"><img id="icon-img-date-a-live" src="https://i.postimg.cc/W36mYgP5/DAL-icon.jpg" alt="约会大作战"></div>
                             <span class="label">约会大作战</span>
