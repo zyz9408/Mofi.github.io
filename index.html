@@ -84,17 +84,19 @@
 
         /* 桌面应用容器 - 支持纵向滚动的3x3网格布局 */
         #desktop-app-container {
-            display: grid;
+            display: grid !important;
             grid-template-columns: repeat(3, 1fr); /* 3列布局 */
             gap: 15px; /* 图标之间的间距 */
-            padding: 10px 15px; /* 内边距 */
-            overflow-x: hidden; /* 隐藏横向滚动 */
-            overflow-y: auto; /* 纵向滚动 */
+            padding: 10px 15px 20px 15px; /* 内边距，底部多一点 */
+            overflow-x: hidden !important; /* 隐藏横向滚动 */
+            overflow-y: auto !important; /* 纵向滚动 */
             -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
             scroll-behavior: smooth; /* 平滑滚动效果 */
-            max-height: calc(100vh - 320px); /* 限制高度，露出下方一半图标 */
+            height: 360px !important; /* 固定高度，确保能显示3.5行 */
+            max-height: 360px !important; /* 最大高度 */
             -ms-overflow-style: none; /* IE 和 Edge 隐藏滚动条 */
             scrollbar-width: none; /* Firefox 隐藏滚动条 */
+            position: relative; /* 定位 */
         }
 
         /* 隐藏滚动条，但保持滚动功能 (WebKit浏览器) */
@@ -108,6 +110,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            min-height: 100px; /* 每个图标最小高度 */
         }
     </style>
     <!-- ▼▼▼ 在这里添加下面这行 ▼▼▼ -->
@@ -10580,7 +10583,7 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
 }
 
 async function downloadBackupFromKodboxViaWebDAV() {
-    const BACKUP_URL = 'https://mofi1994.xyz/?explorer/share/file&hash=8d39Akoz1fZQVvKlt2nEniKquf5gllQEy7TBsIQxGWd5WI_VTjWNlDC71yAnnFp0OQ&name=/ephoneBase.json';
+    const BACKUP_URL = 'https://mofi1994.xyz/?explorer/share/file&hash=42f8rSj9wca5IO0Tjr76olWYRgPlgtNIIKPn_abwLwyQIlDsE5xO0UGFNpKWmVKq7Q&name=/ephoneBase.json';
 
     try {
         const response = await fetch(BACKUP_URL, {
