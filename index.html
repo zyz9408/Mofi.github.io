@@ -38745,8 +38745,13 @@ async function generateAIImage(prompt, chatId) {
         console.log('[服装参考]', clothingDesc);
     }
 
+    // 把参考图的角色一致性要求加入提示词
+    const referenceInstruction = 'Treat the provided reference image as the exact character, match the clothing, hairstyle, expression, and accessories, and render the result as a consistent anime-style portrayal directly based on that reference.';
+    const promptForOptimization = `${enhancedPrompt}
+${referenceInstruction}`;
+
     // 优化提示词
-    const finalPrompt = await optimizePromptWithAI(enhancedPrompt, config);
+    const finalPrompt = await optimizePromptWithAI(promptForOptimization, config);
 
     // 调用对应的API
     if (config.provider === 'runninghub') {
