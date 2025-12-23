@@ -2750,12 +2750,13 @@
             <input type="text" id="chat-image-model" placeholder="gpt-4o">
         </div>
         <div class="form-group">
-            <label for="chat-image-size">图片尺寸</label>
+            <label for="chat-image-size">输出长宽比</label>
             <select id="chat-image-size">
-                <option value="1024x1024">方形 (1024x1024)</option>
-                <option value="1024x1792">竖屏 (1024x1792)</option>
-                <option value="1792x1024">横屏 (1792x1024)</option>
+                <option value="9:16">竖屏 (9:16)</option>
+                <option value="16:9">横屏 (16:9)</option>
+                <option value="1:1">方形 (1:1)</option>
             </select>
+            <small style="color: #666; display: block; margin-top: 5px;">系统会自动选择与所选比例匹配的分辨率，例如9:16对应1024x1792。</small>
         </div>
         <div class="form-group">
             <label style="display: flex; align-items: center; cursor: pointer;">
@@ -38532,6 +38533,31 @@ function applySafetyFilter(prompt) {
     return filtered;
 }
 
+const chatRatioToResolution = {
+    '9:16': '1024x1792',
+    '16:9': '1792x1024',
+    '1:1': '1024x1024'
+};
+const chatResolutionToRatio = Object.fromEntries(
+    Object.entries(chatRatioToResolution).map(([ratio, resolution]) => [resolution, ratio])
+);
+
+function normalizeChatSizeEntry(value) {
+    if (!value) return '9:16';
+    if (value.includes(':')) {
+        return chatRatioToResolution[value] ? value : '9:16';
+    }
+    return chatResolutionToRatio[value] || '9:16';
+}
+
+function getResolutionFromChatSize(value) {
+    if (!value) return chatRatioToResolution['9:16'];
+    if (value.includes('x')) {
+        return value;
+    }
+    return chatRatioToResolution[value] || chatRatioToResolution['9:16'];
+}
+
 /**
  * AI提示词优化
  */
@@ -38610,7 +38636,7 @@ async function callChatAPI(prompt, imageUrl, config) {
                     { type: 'image_url', image_url: { url: imageContent } }
                 ]
             }],
-            size: config.chatApi.size,
+            size: getResolutionFromChatSize(config.chatApi.size),
             max_tokens: 512
         })
     });
@@ -38747,8 +38773,10 @@ async function generateAIImage(prompt, chatId) {
 
     // 把参考图的角色一致性要求加入提示词
     const referenceInstruction = 'Treat the provided reference image as the exact character, match the clothing, hairstyle, expression, and accessories, and render the result as a consistent anime-style portrayal directly based on that reference.';
+    const animeInstruction = 'Focus entirely on anime-style rendering; never depict real-person features or photorealistic humans.';
     const promptForOptimization = `${enhancedPrompt}
-${referenceInstruction}`;
+${referenceInstruction}
+${animeInstruction}`;
 
     // 优化提示词
     const finalPrompt = await optimizePromptWithAI(promptForOptimization, config);
@@ -39260,7 +39288,7 @@ async function loadImageGenTemplate() {
             document.getElementById('chat-image-api-url').value = data.chatApi.url || '';
             document.getElementById('chat-image-api-key').value = data.chatApi.key || '';
             document.getElementById('chat-image-model').value = data.chatApi.model || '';
-            document.getElementById('chat-image-size').value = data.chatApi.size || '1024x1792';
+            document.getElementById('chat-image-size').value = normalizeChatSizeEntry(data.chatApi.size || '9:16');
             document.getElementById('force-base64').checked = data.chatApi.forceBase64 !== undefined ? data.chatApi.forceBase64 : true;
         }
 
@@ -40853,7 +40881,7 @@ document.getElementById('import-bubble-preset-input').addEventListener('change',
         document.getElementById('chat-image-api-url').value = chatApiSettings.url || 'https://tokencount.aigemini.org';
         document.getElementById('chat-image-api-key').value = chatApiSettings.key || '';
         document.getElementById('chat-image-model').value = chatApiSettings.model || 'gpt-4o';
-        document.getElementById('chat-image-size').value = chatApiSettings.size || '1024x1792';
+        document.getElementById('chat-image-size').value = normalizeChatSizeEntry(chatApiSettings.size || '9:16');
         document.getElementById('force-base64').checked = chatApiSettings.forceBase64 !== undefined ? chatApiSettings.forceBase64 : true;
 
         // 加载 RunningHub API 配置
