@@ -10646,6 +10646,49 @@ function putBackupWithProgress(url, blob, authString, onProgress) {
 }
 
 let kodBackupInProgress = false;
+let kodBackupProgressHideTimer = null;
+
+function formatKodBackupBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / (1024 ** unitIndex);
+    return `${value.toFixed(unitIndex === 0 ? 0 : value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
+
+function formatKodBackupDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '';
+    if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))} 秒`;
+    const minutes = Math.ceil(seconds / 60);
+    return minutes < 60 ? `${minutes} 分钟` : `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`;
+}
+
+function updateKodBackupProgress({ phase, percent = 0, status = '', details = '', autoHideMs = 0 }) {
+    const panel = document.getElementById('kod-backup-progress-panel');
+    if (!panel) return;
+
+    if (kodBackupProgressHideTimer) {
+        clearTimeout(kodBackupProgressHideTimer);
+        kodBackupProgressHideTimer = null;
+    }
+
+    const safePercent = Math.max(0, Math.min(100, Math.round(percent)));
+    panel.hidden = false;
+    panel.dataset.phase = phase || 'compress';
+    document.getElementById('kod-backup-progress-percent').textContent = `${safePercent}%`;
+    const progressTrack = panel.querySelector('.kod-backup-progress-track');
+    document.getElementById('kod-backup-progress-bar').style.width = `${safePercent}%`;
+    progressTrack.setAttribute('aria-valuenow', String(safePercent));
+    document.getElementById('kod-backup-progress-status').textContent = status;
+    document.getElementById('kod-backup-progress-details').textContent = details;
+
+    if (autoHideMs > 0) {
+        kodBackupProgressHideTimer = setTimeout(() => {
+            panel.hidden = true;
+            kodBackupProgressHideTimer = null;
+        }, autoHideMs);
+    }
+}
 
 async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
     if (kodBackupInProgress) {
@@ -10665,6 +10708,12 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
     let payload = null;
 
     try {
+        updateKodBackupProgress({
+            phase: 'compress',
+            percent: 0,
+            status: '正在读取并压缩记录…',
+            details: '请保持网页在前台，压缩完成后会自动上传'
+        });
         if (exportButton) {
             exportButton.disabled = true;
             exportButton.textContent = '正在压缩 0%';
@@ -10672,6 +10721,12 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
 
         payload = await createKodBackupPayload(progress => {
             if (exportButton) exportButton.textContent = `正在压缩 ${progress.percent}%`;
+            updateKodBackupProgress({
+                phase: 'compress',
+                percent: progress.percent,
+                status: `正在压缩：${progress.tableName || '整理文件'}`,
+                details: '按批读取记录，避免 iOS 浏览器内存占用过高'
+            });
             console.log(`[备份] 正在压缩 ${progress.tableName || '收尾'}: ${progress.percent}%`);
         });
 
@@ -10682,18 +10737,42 @@ async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
 
         const uploadUrl = DAV_CONFIG.baseUrl + DAV_CONFIG.path + payload.extension;
         const authString = btoa(`${DAV_CONFIG.username}:${DAV_CONFIG.password}`);
-        await putBackupWithProgress(uploadUrl, payload.blob, authString, percent => {
+        const uploadStartedAt = performance.now();
+        await putBackupWithProgress(uploadUrl, payload.blob, authString, (percent, loaded, total) => {
+            const elapsedSeconds = Math.max((performance.now() - uploadStartedAt) / 1000, 0.1);
+            const bytesPerSecond = loaded / elapsedSeconds;
+            const eta = bytesPerSecond > 0 ? (total - loaded) / bytesPerSecond : Number.NaN;
             if (exportButton) exportButton.textContent = `正在上传 ${percent}%（${fileSizeMB} MB）`;
+            updateKodBackupProgress({
+                phase: 'upload',
+                percent,
+                status: '正在上传到云端…',
+                details: `${formatKodBackupBytes(loaded)} / ${formatKodBackupBytes(total)} · ${formatKodBackupBytes(bytesPerSecond)}/秒${percent < 100 ? ` · 约剩 ${formatKodBackupDuration(eta)}` : ''}`
+            });
             console.log(`[备份] 上传进度: ${percent}%`);
         });
 
         localStorage.setItem('lastSuccessfulKodBackupAt', String(Date.now()));
+        updateKodBackupProgress({
+            phase: 'success',
+            percent: 100,
+            status: '云端备份完成',
+            details: `已上传 ${fileSizeMB} MB`,
+            autoHideMs: 5000
+        });
         if (showAlerts) {
             await showCustomAlert('上传成功', `压缩备份已上传到 KOD 云！\n文件大小：${fileSizeMB} MB`);
         }
         return true;
     } catch (error) {
         console.error('上传备份到 KOD 云时出错:', error);
+        updateKodBackupProgress({
+            phase: 'error',
+            percent: 0,
+            status: '云端备份失败',
+            details: error.message || '请检查网络后重试',
+            autoHideMs: 10000
+        });
         if (showAlerts) {
             await showCustomAlert('云端备份失败', `${error.message}\n\n数据没有被删除，请检查网络后重试。`);
         }
@@ -47220,5 +47299,16 @@ const avatarFrames = [
 <input type="file" id="world-book-import-input" accept=".json, .jsonl" style="display: none;">
 <input type="file" id="ludo-qbank-import-input" accept=".json" hidden>
 <input type="file" id="inner-voice-bg-input" accept="image/*" hidden>
+<section id="kod-backup-progress-panel" class="kod-backup-progress-panel" data-phase="compress" hidden aria-live="polite" aria-atomic="true">
+    <div class="kod-backup-progress-heading">
+        <strong>云端备份</strong>
+        <span id="kod-backup-progress-percent">0%</span>
+    </div>
+    <div class="kod-backup-progress-track" role="progressbar" aria-label="云端备份进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="kod-backup-progress-bar" class="kod-backup-progress-bar"></div>
+    </div>
+    <div id="kod-backup-progress-status" class="kod-backup-progress-status">准备中…</div>
+    <div id="kod-backup-progress-details" class="kod-backup-progress-details"></div>
+</section>
 </body>
 </html>

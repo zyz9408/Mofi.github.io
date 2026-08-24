@@ -18544,3 +18544,70 @@ body {
 #phone-screen.dark-mode #character-chat-list.list-container {
     background-color: #000000;
 }
+
+/* 云端备份前台实时进度 */
+.kod-backup-progress-panel {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  z-index: 100000;
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 14px 16px;
+  color: #222;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  font-size: 13px;
+}
+
+.kod-backup-progress-panel[hidden] {
+  display: none;
+}
+
+.kod-backup-progress-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  font-size: 15px;
+}
+
+.kod-backup-progress-track {
+  height: 8px;
+  overflow: hidden;
+  background: #ececf1;
+  border-radius: 999px;
+}
+
+.kod-backup-progress-bar {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa, #8b5cf6);
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.kod-backup-progress-panel[data-phase="success"] .kod-backup-progress-bar {
+  background: #34c759;
+}
+
+.kod-backup-progress-panel[data-phase="error"] .kod-backup-progress-bar {
+  background: #ff3b30;
+}
+
+.kod-backup-progress-status {
+  margin-top: 9px;
+  font-weight: 600;
+}
+
+.kod-backup-progress-details {
+  min-height: 18px;
+  margin-top: 3px;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+}

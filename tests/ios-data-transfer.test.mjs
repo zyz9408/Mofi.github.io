@@ -20,6 +20,10 @@ assert.doesNotMatch(
 
 assert.match(html, /new DecompressionStream\(['"]gzip['"]\)/);
 assert.match(html, /extension:\s*supportsGzip\s*\?\s*['"]\.json\.gz['"]/);
+assert.match(html, /id="kod-backup-progress-panel"/);
+assert.match(html, /function updateKodBackupProgress/);
+assert.match(html, /formatKodBackupBytes\(loaded\)/);
+assert.match(html, /formatKodBackupDuration\(eta\)/);
 
 const startupTail = html.slice(html.indexOf('// ▼▼▼ 自动备份到 KOD 云'));
 assert.match(startupTail.slice(0, 1800), /KOD_AUTO_BACKUP_INTERVAL/);
