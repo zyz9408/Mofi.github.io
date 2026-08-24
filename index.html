@@ -660,14 +660,14 @@
 <button class="form-button" id="save-api-settings-btn">保存设置</button>
 			<hr style="margin:20px 0; opacity:.3">
 <button class="form-button form-button-secondary" id="clear-orphaned-data-btn" style="margin-top: 10px; border-color: #ff9966; color: #ff9966;">🧹 清理失效数据</button>
-			<button class="form-button" id="export-data-btn">导出数据</button>
+			<button class="form-button" id="export-data-btn">压缩备份到云端</button>
 <!-- ▼▼▼ 在这里粘贴下面的新按钮 ▼▼▼ -->
 <button class="form-button form-button-secondary" id="export-data-stream-btn" style="margin-top: 10px;">流式导出 (大数据专用)</button>
 <!-- ① 普通按钮，和“导出”一个 class -->
 <button class="form-button" id="import-btn">导入备份文件</button>
 <button class="form-button" id="advanced-transfer-btn" style="background-color: #6f42c1; margin-top: 10px;">高级导入/导出</button>
 <!-- ② 真正的文件选择器，完全隐藏 -->
-<input id="import-data-input" type="file" accept="application/json" hidden>
+<input id="import-data-input" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
 
 </div></div>
 <!-- ▼▼▼ 用下面这段代码，完整替换掉你原来的 chat-list-screen ▼▼▼ -->
@@ -10435,13 +10435,287 @@ async function exportBackup() {
 }
 
 // ▼▼▼ KOD 云 WebDAV 上传功能 ▼▼▼
+const KOD_BACKUP_TABLES = [
+    'chats', 'worldBooks', 'userStickers', 'charStickers', 'apiConfig', 'globalSettings',
+    'personaPresets', 'musicLibrary', 'qzoneSettings', 'qzonePosts', 'qzoneAlbums',
+    'qzonePhotos', 'favorites', 'qzoneGroups', 'memories', 'worldBookCategories',
+    'callRecords', 'customAvatarFrames', 'themes', 'apiPresets', 'bubbleStylePresets',
+    'fontPresets', 'homeScreenPresets', 'datingScenes', 'datingPresets',
+    'datingSpriteGroups', 'datingSprites', 'datingHistory', 'pomodoroSessions',
+    'ludoQuestionBanks', 'ludoQuestions', 'scriptKillScripts', 'taobaoProducts',
+    'taobaoOrders', 'taobaoCart', 'userWalletTransactions', 'userStickerCategories',
+    'imageGenTemplates'
+];
+
+const KOD_SINGLETON_TABLES = new Set([
+    'apiConfig', 'globalSettings', 'musicLibrary', 'qzoneSettings'
+]);
+
+function getBackupHomeScreenState() {
+    return {
+        'profile-banner-img': document.getElementById('profile-banner-img')?.src || '',
+        'profile-avatar-img': document.getElementById('profile-avatar-img')?.src || '',
+        'homeAvatarFrame': document.getElementById('profile-avatar-frame')?.src || '',
+        'profile-username': document.getElementById('profile-username')?.textContent || '',
+        'profile-sub-username': document.getElementById('profile-sub-username')?.textContent || '',
+        'profile-bio': document.getElementById('profile-bio')?.textContent || '',
+        'profile-location': document.getElementById('profile-location')?.innerHTML || '',
+        'widget-bubble-1': document.getElementById('widget-bubble-1')?.textContent || '',
+        'widget-image-1': document.getElementById('widget-image-1')?.src || '',
+        'widget-subtext-1': document.getElementById('widget-subtext-1')?.textContent || '',
+        'widget-bubble-2': document.getElementById('widget-bubble-2')?.textContent || '',
+        'widget-image-2': document.getElementById('widget-image-2')?.src || '',
+        'widget-subtext-2': document.getElementById('widget-subtext-2')?.textContent || '',
+        'widget-image-3': document.getElementById('widget-image-3')?.src || '',
+        'second-page-bubble': document.getElementById('second-page-bubble')?.textContent || '',
+        'flat-capsule-bubble': document.getElementById('flat-capsule-bubble')?.textContent || '',
+        'circular-bubble': document.getElementById('circular-bubble')?.textContent || '',
+        'widget-image-4': document.getElementById('widget-image-4')?.src || '',
+        'avatar-subtitle': document.getElementById('avatar-subtitle')?.textContent || '',
+        'bubble-top-left': document.getElementById('bubble-top-left')?.textContent || '',
+        'bubble-top-right': document.getElementById('bubble-top-right')?.textContent || '',
+        'bubble-bottom-left': document.getElementById('bubble-bottom-left')?.textContent || '',
+        'bubble-bottom-right': document.getElementById('bubble-bottom-right')?.textContent || '',
+        'new-widget-avatar': document.getElementById('new-widget-avatar')?.src || '',
+        'new-widget-text-1': document.getElementById('new-widget-text-1')?.textContent || '',
+        'new-widget-text-2': document.getElementById('new-widget-text-2')?.textContent || '',
+        'new-widget-text-3': document.getElementById('new-widget-text-3')?.textContent || '',
+        'widget-month-display': document.getElementById('widget-month-display')?.textContent || '',
+        'appIcons': { ...state.globalSettings.appIcons },
+        'appLabels': { ...state.globalSettings.appLabels },
+        'wallpaper': state.globalSettings.wallpaper
+    };
+}
+
+/**
+ * 按记录写入 gzip，避免先在内存里生成一份 90MB 的完整 JSON 字符串。
+ * Safari 16.6+ 的 CompressionStream 已修复大输出问题；旧浏览器会降级为普通 JSON。
+ */
+function supportsReliableGzipCompression() {
+    if (typeof CompressionStream !== 'function') return false;
+
+    const iosMatch = navigator.userAgent.match(/OS (\d+)_(\d+)/);
+    if (iosMatch) {
+        const major = Number(iosMatch[1]);
+        const minor = Number(iosMatch[2]);
+        if (major === 16 && minor < 6) return false;
+    }
+
+    const safariMatch = navigator.userAgent.match(/Version\/(\d+)\.(\d+).*Safari/);
+    if (safariMatch) {
+        const major = Number(safariMatch[1]);
+        const minor = Number(safariMatch[2]);
+        if (major === 16 && minor < 6) return false;
+    }
+
+    return true;
+}
+
+async function createKodBackupPayload(onProgress = () => {}) {
+    const supportsGzip = supportsReliableGzipCompression();
+    const encoder = new TextEncoder();
+    const outputParts = [];
+    const writeBufferLimit = 512 * 1024;
+    const indexedDbBatchSize = 8;
+    let writer;
+    let outputPromise;
+    let writeBuffer = '';
+
+    if (supportsGzip) {
+        const gzip = new CompressionStream('gzip');
+        writer = gzip.writable.getWriter();
+        outputPromise = new Response(gzip.readable).blob();
+    } else {
+        writer = {
+            async write(chunk) { outputParts.push(chunk); },
+            async close() {},
+            async abort() {}
+        };
+    }
+
+    // 合并小字符串后再交给压缩流，避免每个逗号、每条小记录都触发一次流写入。
+    const flushWriteBuffer = async () => {
+        if (!writeBuffer) return;
+        const chunk = writeBuffer;
+        writeBuffer = '';
+        await writer.write(encoder.encode(chunk));
+    };
+
+    const writeJson = async text => {
+        if (!text) return;
+        if (text.length >= writeBufferLimit) {
+            await flushWriteBuffer();
+            await writer.write(encoder.encode(text));
+            return;
+        }
+        if (writeBuffer.length + text.length > writeBufferLimit) {
+            await flushWriteBuffer();
+        }
+        writeBuffer += text;
+    };
+
+    try {
+        await writeJson(`{"version":1,"timestamp":${Date.now()}`);
+
+        for (let tableIndex = 0; tableIndex < KOD_BACKUP_TABLES.length; tableIndex++) {
+            const tableName = KOD_BACKUP_TABLES[tableIndex];
+            const table = db[tableName];
+            if (!table) continue;
+
+            onProgress({
+                phase: 'compress',
+                tableName,
+                percent: Math.round((tableIndex / KOD_BACKUP_TABLES.length) * 100)
+            });
+
+            await writeJson(`,${JSON.stringify(tableName)}:`);
+
+            if (KOD_SINGLETON_TABLES.has(tableName)) {
+                const value = await table.get('main');
+                await writeJson(JSON.stringify(value ?? null));
+                continue;
+            }
+
+            await writeJson('[');
+            const keys = await table.toCollection().primaryKeys();
+            for (let batchStart = 0; batchStart < keys.length; batchStart += indexedDbBatchSize) {
+                const batchKeys = keys.slice(batchStart, batchStart + indexedDbBatchSize);
+                const values = typeof table.bulkGet === 'function'
+                    ? await table.bulkGet(batchKeys)
+                    : await Promise.all(batchKeys.map(key => table.get(key)));
+
+                for (let batchIndex = 0; batchIndex < values.length; batchIndex++) {
+                    const recordIndex = batchStart + batchIndex;
+                    if (recordIndex > 0) await writeJson(',');
+                    await writeJson(JSON.stringify(values[batchIndex]));
+                }
+
+                onProgress({
+                    phase: 'compress',
+                    tableName,
+                    percent: Math.round(((tableIndex + Math.min(1, (batchStart + values.length) / keys.length)) / KOD_BACKUP_TABLES.length) * 100)
+                });
+            }
+            await writeJson(']');
+        }
+
+        await writeJson(`,"homeScreenState":${JSON.stringify(getBackupHomeScreenState())}}`);
+        await flushWriteBuffer();
+        await writer.close();
+
+        const blob = supportsGzip
+            ? await outputPromise
+            : new Blob(outputParts, { type: 'application/json' });
+
+        onProgress({ phase: 'compress', tableName: '', percent: 100 });
+        return {
+            blob: supportsGzip
+                ? new Blob([blob], { type: 'application/gzip' })
+                : blob,
+            compressed: supportsGzip,
+            extension: supportsGzip ? '.json.gz' : '.json'
+        };
+    } catch (error) {
+        try { await writer.abort(error); } catch (_) {}
+        throw error;
+    }
+}
+
+function putBackupWithProgress(url, blob, authString, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', url, true);
+        xhr.timeout = 10 * 60 * 1000;
+        xhr.setRequestHeader('Authorization', `Basic ${authString}`);
+        xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+
+        xhr.upload.onprogress = event => {
+            if (event.lengthComputable) {
+                onProgress(Math.round((event.loaded / event.total) * 100), event.loaded, event.total);
+            }
+        };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error(`上传失败: ${xhr.status} ${xhr.statusText}`));
+        };
+        xhr.onerror = () => reject(new Error('网络连接中断，请稍后重试'));
+        xhr.ontimeout = () => reject(new Error('上传超过10分钟，已停止本次备份'));
+        xhr.onabort = () => reject(new Error('上传已取消'));
+        xhr.send(blob);
+    });
+}
+
+let kodBackupInProgress = false;
+
 async function uploadBackupToKodboxViaWebDAV(showAlerts = true) {
+    if (kodBackupInProgress) {
+        console.log('[备份] 已有备份任务正在执行，本次请求已跳过。');
+        return false;
+    }
+    kodBackupInProgress = true;
+
+    const DAV_CONFIG = {
+        baseUrl: 'https://mofi1994.xyz/index.php/dav/my/',
+        path: 'backups/ephoneNew',
+        username: 'zyz9408',
+        password: 'a600422mm'
+    };
+    const exportButton = document.getElementById('export-data-btn');
+    const originalButtonText = exportButton?.textContent || '压缩备份到云端';
+    let payload = null;
+
+    try {
+        if (exportButton) {
+            exportButton.disabled = true;
+            exportButton.textContent = '正在压缩 0%';
+        }
+
+        payload = await createKodBackupPayload(progress => {
+            if (exportButton) exportButton.textContent = `正在压缩 ${progress.percent}%`;
+            console.log(`[备份] 正在压缩 ${progress.tableName || '收尾'}: ${progress.percent}%`);
+        });
+
+        const fileSizeMB = (payload.blob.size / 1024 / 1024).toFixed(2);
+        console.log(`[备份] ${payload.compressed ? 'gzip压缩后' : '未压缩'}大小: ${fileSizeMB} MB (${payload.blob.size} bytes)`);
+
+        if (exportButton) exportButton.textContent = `正在上传 0%（${fileSizeMB} MB）`;
+
+        const uploadUrl = DAV_CONFIG.baseUrl + DAV_CONFIG.path + payload.extension;
+        const authString = btoa(`${DAV_CONFIG.username}:${DAV_CONFIG.password}`);
+        await putBackupWithProgress(uploadUrl, payload.blob, authString, percent => {
+            if (exportButton) exportButton.textContent = `正在上传 ${percent}%（${fileSizeMB} MB）`;
+            console.log(`[备份] 上传进度: ${percent}%`);
+        });
+
+        localStorage.setItem('lastSuccessfulKodBackupAt', String(Date.now()));
+        if (showAlerts) {
+            await showCustomAlert('上传成功', `压缩备份已上传到 KOD 云！\n文件大小：${fileSizeMB} MB`);
+        }
+        return true;
+    } catch (error) {
+        console.error('上传备份到 KOD 云时出错:', error);
+        if (showAlerts) {
+            await showCustomAlert('云端备份失败', `${error.message}\n\n数据没有被删除，请检查网络后重试。`);
+        }
+        throw error;
+    } finally {
+        payload = null;
+        kodBackupInProgress = false;
+        if (exportButton) {
+            exportButton.disabled = false;
+            exportButton.textContent = originalButtonText;
+        }
+    }
+}
+
+// 旧版一次性 JSON 上传实现保留作格式参考，但不再调用，也不保留有效凭据。
+async function uploadBackupToKodboxViaWebDAVLegacyDisabled(showAlerts = true) {
     // WebDAV 配置
     const DAV_CONFIG = {
         baseUrl: 'https://mofi1994.xyz/index.php/dav/my/',
         path: 'backups/ephoneNew.json',
-        username: 'zyz9408',
-        password: 'a600422mm',
+        username: '',
+        password: '',
     };
 
     try {
@@ -10645,9 +10919,8 @@ async function downloadBackupFromKodboxViaWebDAV() {
             throw new Error(`下载失败: ${response.status} ${response.statusText}`);
         }
 
-        const backupText = await response.text();
-        const backupBlob = new Blob([backupText], { type: 'application/json' });
-
+        // 直接交给导入函数，避免先生成完整字符串、再复制成 Blob 的双倍内存占用。
+        const backupBlob = await response.blob();
         await importBackup(backupBlob);
 
     } catch (error) {
@@ -10657,6 +10930,20 @@ async function downloadBackupFromKodboxViaWebDAV() {
 }
 // ▲▲▲ KOD 云 WebDAV 功能结束 ▲▲▲
 
+
+async function readBackupText(file) {
+    const magic = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    const isGzip = magic[0] === 0x1f && magic[1] === 0x8b;
+
+    if (!isGzip) return file.text();
+
+    if (typeof DecompressionStream !== 'function') {
+        throw new Error('当前 Safari 版本无法解压 gzip，请升级 iOS 后重试');
+    }
+
+    const decompressedStream = file.stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(decompressedStream).text();
+}
 
 // ▼▼▼ 请用这【一整块终极修复版】的代码，完整替换掉你旧的 importBackup 函数 ▼▼▼
 async function importBackup(file) {
@@ -10671,7 +10958,7 @@ async function importBackup(file) {
     if (!confirmed) return;
 
     try {
-        const text = await file.text();
+        const text = await readBackupText(file);
         const data = JSON.parse(text);
 
         await db.transaction('rw', db.tables, async () => {
@@ -46272,16 +46559,56 @@ if (lockScreenEnabled) {
 // ▲▲▲ 替换结束 ▲▲▲
 
 // ▼▼▼ 自动备份到 KOD 云 ▼▼▼
-// 延迟3秒后自动上传备份，避免影响页面加载
-setTimeout(async () => {
+// iOS Safari 经常长期驻留而不重新加载，因此不能只在页面启动时安排一次。
+// 定时检查 + 回到前台 + 恢复网络都会重新判断是否到期。
+const KOD_AUTO_BACKUP_INTERVAL = 6 * 60 * 60 * 1000;
+const KOD_AUTO_BACKUP_CHECK_INTERVAL = 15 * 60 * 1000;
+const KOD_AUTO_BACKUP_RETRY_INTERVAL = 30 * 60 * 1000;
+let kodAutoBackupCheckTimer = null;
+
+async function checkAndRunAutoKodBackup(reason = '定时检查') {
+    if (kodBackupInProgress) return;
+    if (document.visibilityState === 'hidden') return;
+    if (navigator.onLine === false) return;
+
+    const now = Date.now();
+    const lastSuccess = Number(localStorage.getItem('lastSuccessfulKodBackupAt') || 0);
+    const lastAttempt = Number(localStorage.getItem('lastKodBackupAttemptAt') || 0);
+
+    if (now - lastSuccess < KOD_AUTO_BACKUP_INTERVAL) return;
+    if (now - lastAttempt < KOD_AUTO_BACKUP_RETRY_INTERVAL) return;
+
+    // 先记录尝试时间；即使失败也冷却30分钟，避免差网络下循环重试。
+    localStorage.setItem('lastKodBackupAttemptAt', String(now));
     try {
-        console.log('正在自动备份到 KOD 云...');
-        await uploadBackupToKodboxViaWebDAV(false); // false = 不显示成功提示
-        console.log('自动备份完成');
+        console.log(`[备份] ${reason}：开始自动压缩备份...`);
+        await uploadBackupToKodboxViaWebDAV(false);
+        console.log('[备份] 自动压缩备份完成');
     } catch (error) {
-        console.warn('自动备份失败（不影响使用）:', error);
+        console.warn('[备份] 自动备份失败（不影响使用）:', error);
     }
-}, 3000);
+}
+
+function scheduleAutoKodBackupCheck(reason, delay = 5000) {
+    if (kodAutoBackupCheckTimer) clearTimeout(kodAutoBackupCheckTimer);
+    kodAutoBackupCheckTimer = setTimeout(() => {
+        kodAutoBackupCheckTimer = null;
+        checkAndRunAutoKodBackup(reason);
+    }, delay);
+}
+
+// 首次进入等待页面稳定；长期打开时每15分钟检查一次。
+scheduleAutoKodBackupCheck('页面启动', 30000);
+setInterval(() => checkAndRunAutoKodBackup('定时检查'), KOD_AUTO_BACKUP_CHECK_INTERVAL);
+
+// iOS 从后台恢复时，计时器可能曾被系统冻结；回到前台后主动补一次检查。
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        scheduleAutoKodBackupCheck('回到前台');
+    }
+});
+window.addEventListener('pageshow', () => scheduleAutoKodBackupCheck('页面恢复'));
+window.addEventListener('online', () => scheduleAutoKodBackupCheck('网络恢复'));
 // ▲▲▲ 自动备份结束 ▲▲▲
 
 // ▼▼▼ 自动加载并应用默认主屏幕预设 ▼▼▼
